@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_fotos"
+        android:icon="@drawable/camera"
+        android:title="Fotos"
+        android:enabled="true"/>
+
+    <item
+        android:id="@+id/nav_fotosfamilia"
+        android:icon="@drawable/family"
+        android:title="Fotos Familia"
+        android:enabled="true"/>
+
+    <item
+        android:id="@+id/nav_pets"
+        android:icon="@drawable/pawprint"
+        android:title="Mascotas"
+        android:enabled="true"/>
+
+    <item
+        android:id="@+id/nav_recordatorios"
+        android:icon="@drawable/reminder"
+        android:title="Recordatorios"
+        android:enabled="true"/>
+
+    <item
+        android:id="@+id/nav_notification"
+        android:icon="@drawable/notification"
+        android:title="Notificaciones"
+        android:enabled="true"/>
+</menu>
