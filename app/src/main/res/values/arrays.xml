@@ -1,0 +1,23 @@
+<resources>
+    <!-- Array para las etiquetas visibles al usuario -->
+    <string-array name="pet_types">
+        <item>Perro</item>
+        <item>Gato</item>
+        <item>Ave</item>
+        <item>Pez</item>
+        <item>Roedor</item>
+        <item>Reptil</item>
+        <item>Otro</item>
+    </string-array>
+
+    <!-- Array para los valores que se enviarán al backend -->
+    <string-array name="pet_type_values">
+        <item>DOG</item>
+        <item>CAT</item>
+        <item>BIRD</item>
+        <item>FISH</item>
+        <item>RODENT</item>
+        <item>REPTILE</item>
+        <item>OTHER</item>
+    </string-array>
+</resources>

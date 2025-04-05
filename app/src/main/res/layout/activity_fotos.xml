@@ -7,6 +7,43 @@
     android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
     tools:context=".fotos">
 
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:layout_alignParentTop="true"
+        android:background="@color/primary"
+        android:elevation="4dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <!-- Título (puedes cambiarlo por un ícono o logo) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mis Fotos"
+            android:textColor="@android:color/black"
+            android:textSize="18sp"
+            android:textStyle="bold"/>
+
+        <!-- Puedes añadir más elementos, como un botón de ajustes a la derecha -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1"/>
+
+        <ImageView
+            android:id="@+id/settingsIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/settings"
+            android:contentDescription="Ajustes"
+            android:clickable="true"
+            android:focusable="true"/>
+    </LinearLayout>
+
     <!-- Contenido principal (puede ser un ConstraintLayout si lo prefieres) -->
     <FrameLayout
         android:id="@+id/container"
