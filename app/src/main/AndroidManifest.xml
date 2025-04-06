@@ -24,6 +24,9 @@
             android:name=".notification"
             android:exported="false" />
         <activity
+            android:name=".FamilySetupActivity"
+            android:exported="false"/>
+        <activity
             android:name=".recordatorios"
             android:exported="false" />
         <activity

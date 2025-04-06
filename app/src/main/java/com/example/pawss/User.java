@@ -1,6 +1,9 @@
 package com.example.pawss;
 
+import org.json.JSONArray;
+
 public class User {
+    public static JSONArray objects;
     private int id;
     private String email;
     private String first_name;
