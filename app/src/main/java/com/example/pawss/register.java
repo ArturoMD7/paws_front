@@ -25,7 +25,8 @@ public class register extends AppCompatActivity {
     private Button registerButton;
     private ProgressBar progressBar;
     private RequestQueue requestQueue;
-    private final String API_URL = "http://192.168.1.64:8000/api/users/signup/";
+    private String apiUrl;
+    private String API_URL;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,8 +44,10 @@ public class register extends AppCompatActivity {
         progressBar = findViewById(R.id.progressBar);
 
         requestQueue = Volley.newRequestQueue(this);
+        String apiUrl  = getString(R.string.apiUrl);
 
         registerButton.setOnClickListener(v -> registerUser());
+
     }
 
     private void registerUser() {
@@ -80,6 +83,9 @@ public class register extends AppCompatActivity {
             progressBar.setVisibility(View.GONE);
             return;
         }
+        apiUrl = getString(R.string.apiUrl);
+        API_URL = apiUrl + "users/signup/";
+
 
         JsonObjectRequest request = new JsonObjectRequest(
                 Request.Method.POST,
@@ -89,28 +95,19 @@ public class register extends AppCompatActivity {
                     registerButton.setEnabled(true);
                     progressBar.setVisibility(View.GONE);
 
-                    try {
-                        Log.d("REGISTER_RESPONSE", "Respuesta: " + response.toString());
+                    Log.d("REGISTER_RESPONSE", "Respuesta: " + response.toString());
 
-                        // Verificar si el registro fue exitoso (el servidor debe devolver el ID)
-                        if (response.has("id")) {
-                            int userId = response.getInt("id");
+                    // Verificar si el registro fue exitoso
+                    if (response.has("id")) {
+                        Toast.makeText(register.this, "Registro exitoso. Por favor inicie sesión", Toast.LENGTH_LONG).show();
 
-                            // Navegar a pantalla de configuración de familia
-                            Intent intent = new Intent(register.this, FamilySetupActivity.class);
-                            intent.putExtra("user_id", userId);
-                            startActivity(intent);
-                            finish();
-
-                            Log.d("REGISTER_FLOW", "Redireccionando a FamilySetupActivity con user_id: " + userId);
-                        } else {
-                            Toast.makeText(register.this, "Registro exitoso pero falta ID en la respuesta", Toast.LENGTH_LONG).show();
-                            Log.e("REGISTER_ERROR", "La respuesta no contiene ID de usuario");
-                        }
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                        Toast.makeText(register.this, "Error al procesar la respuesta del servidor", Toast.LENGTH_LONG).show();
-                        Log.e("REGISTER_ERROR", "Error JSON: " + e.getMessage());
+                        // Go back to login screen
+                        Intent intent = new Intent(register.this, MainActivity.class);
+                        startActivity(intent);
+                        finish();
+                    } else {
+                        Toast.makeText(register.this, "Registro exitoso pero falta ID en la respuesta", Toast.LENGTH_LONG).show();
+                        Log.e("REGISTER_ERROR", "La respuesta no contiene ID de usuario");
                     }
                 },
                 error -> {

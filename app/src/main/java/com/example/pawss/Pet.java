@@ -1,5 +1,7 @@
 package com.example.pawss;
 
+import android.content.Context;
+
 public class Pet {
     private int id;
     private String name;
@@ -9,8 +11,10 @@ public class Pet {
     private String adoptionDate;
     private String photoUrl;
     private String vaccinesUrl;
+    private String urlApi;
+    private int ownerId;  // Nuevo campo para el ID del dueño
 
-    public Pet(int id, String name, String type, int age, String breed,
+    public Pet(Context context, int id, String name, String type, int age, String breed,
                String adoptionDate, String photoUrl, String vaccinesUrl) {
         this.id = id;
         this.name = name;
@@ -20,6 +24,7 @@ public class Pet {
         this.adoptionDate = adoptionDate;
         this.photoUrl = photoUrl;
         this.vaccinesUrl = vaccinesUrl;
+        this.urlApi = context.getString(R.string.Url);
     }
 
     // Getters mejorados para manejar URLs
@@ -29,13 +34,13 @@ public class Pet {
     public int getAge() { return age; }
     public String getBreed() { return breed; }
     public String getAdoptionDate() { return adoptionDate; }
+    public int getOwnerId() { return ownerId; }
 
     public String getPhotoUrl() {
         if (photoUrl != null && !photoUrl.isEmpty()) {
             if (!photoUrl.startsWith("http")) {
-                // Asegurar que no tenga barras duplicadas
                 String cleanPath = photoUrl.startsWith("/") ? photoUrl.substring(1) : photoUrl;
-                return "http://192.168.1.64:8000/media/" + cleanPath;
+                return urlApi + "media/" + cleanPath;
             }
             return photoUrl;
         }
@@ -46,7 +51,7 @@ public class Pet {
         if (vaccinesUrl != null && !vaccinesUrl.isEmpty()) {
             if (!vaccinesUrl.startsWith("http")) {
                 String cleanPath = vaccinesUrl.startsWith("/") ? vaccinesUrl.substring(1) : vaccinesUrl;
-                return "http://192.168.1.64:8000/media/" + cleanPath;
+                return urlApi + "media/" + cleanPath;
             }
             return vaccinesUrl;
         }

@@ -75,6 +75,7 @@ public class pets extends BaseActivity {
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int PICK_VACCINE_FILE_REQUEST = 2;
 
+
     @Override
     protected int getLayoutResourceId() {
         return R.layout.activity_pets;
@@ -136,8 +137,18 @@ public class pets extends BaseActivity {
         rvPets.setAdapter(petAdapter);
     }
 
+    private int getFamilyId() {
+        int familyId = authManager.getFamilyId();
+        if (familyId == -1) {
+            Log.e("PetLoad", "Family ID not found in AuthManager");
+            Toast.makeText(this, "Error: No se encontró el ID de la familia", Toast.LENGTH_SHORT).show();
+        }
+        return familyId;
+    }
+
     private void loadPets() {
-        String url = "http://192.168.1.64:8000/api/pets/?owner=" + authManager.getUserId();
+        String apiUrl = getString(R.string.apiUrl);
+        String url = apiUrl + "pets/";
 
         StringRequest request = new StringRequest(Request.Method.GET, url,
                 response -> {
@@ -145,31 +156,35 @@ public class pets extends BaseActivity {
                         JSONArray petsArray = new JSONArray(response);
                         petList.clear();
 
+                        // Primero obtener la familia del usuario
+                        int familyId = getFamilyId(); // Implementa este método según tu lógica
+
                         for (int i = 0; i < petsArray.length(); i++) {
                             JSONObject petJson = petsArray.getJSONObject(i);
+                            JSONObject ownerJson = petJson.getJSONObject("owner");
+                            int ownerFamilyId = ownerJson.getInt("family_id"); // Asume que el dueño tiene family_id
 
-                            // Parsear los datos manteniendo las URLs relativas
-                            Pet pet = new Pet(
-                                    petJson.getInt("id"),
-                                    petJson.getString("name"),
-                                    petJson.getString("pet_type"),
-                                    petJson.getInt("age"),
-                                    petJson.getString("breed"),
-                                    petJson.optString("adoption_date", ""),
-                                    petJson.optString("photo", ""),
-                                    petJson.optString("vaccines", "")
-                            );
-                            petList.add(pet);
-
-                            // Log para depuración
-                            Log.d("PetLoad", "Mascota cargada: " + pet.getName() +
-                                    ", Foto URL: " + pet.getPhotoUrl());
+                            // Solo agregar mascotas de la misma familia
+                            if (ownerFamilyId == familyId) {
+                                Pet pet = new Pet(
+                                        this,
+                                        petJson.getInt("id"),
+                                        petJson.getString("name"),
+                                        petJson.getString("pet_type"),
+                                        petJson.getInt("age"),
+                                        petJson.getString("breed"),
+                                        petJson.optString("adoption_date", ""),
+                                        petJson.optString("photo", ""),
+                                        petJson.optString("vaccines", "")
+                                );
+                                petList.add(pet);
+                            }
                         }
 
                         petAdapter.notifyDataSetChanged();
 
                         if (petList.isEmpty()) {
-                            Toast.makeText(this, "No tienes mascotas registradas", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "No hay mascotas registradas en tu familia", Toast.LENGTH_SHORT).show();
                         }
                     } catch (JSONException e) {
                         Log.e("PetLoad", "Error parsing JSON", e);
@@ -177,12 +192,7 @@ public class pets extends BaseActivity {
                     }
                 },
                 error -> {
-                    String errorMsg = "Error al cargar mascotas: " + error.toString();
-                    Log.e("PetLoad", errorMsg);
-                    if (error.networkResponse != null) {
-                        errorMsg += ": " + new String(error.networkResponse.data);
-                    }
-                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
+                    // Manejo de errores
                 }) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
@@ -192,14 +202,8 @@ public class pets extends BaseActivity {
             }
         };
 
-        request.setRetryPolicy(new DefaultRetryPolicy(
-                10000,
-                DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
-                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-
         requestQueue.add(request);
     }
-
     private void setupPetTypeSpinner() {
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
                 R.array.pet_types, android.R.layout.simple_spinner_item);
@@ -353,10 +357,10 @@ public class pets extends BaseActivity {
         if (!etAdoptionDate.getText().toString().trim().isEmpty()) {
             params.put("adoption_date", etAdoptionDate.getText().toString().trim());
         }
-
+        String apiUrl = getString(R.string.apiUrl);
         VolleyMultipartRequest multipartRequest = new VolleyMultipartRequest(
                 Request.Method.POST,
-                "http://192.168.1.64:8000/api/pets/",
+                apiUrl + "pets/",
                 new Response.Listener<NetworkResponse>() {
                     @Override
                     public void onResponse(NetworkResponse response) {
@@ -455,7 +459,8 @@ public class pets extends BaseActivity {
     }
 
     private void deletePet(int petId) {
-        String url = "http://192.168.1.64:8000/api/pets/" + petId + "/";
+        String apiUrl = getString(R.string.apiUrl);
+        String url = apiUrl + "pets/" + petId + "/";
 
         StringRequest request = new StringRequest(Request.Method.DELETE, url,
                 response -> {

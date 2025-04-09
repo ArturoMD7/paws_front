@@ -15,6 +15,9 @@ import com.google.gson.Gson;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class MainActivity extends AppCompatActivity {
     private EditText email, password;
     private Button loginButton, registerButton;
@@ -31,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Verificar si ya está logueado
         if (authManager.isLoggedIn()) {
-            navigateToHome();
+            checkFamilyStatus();
             return;
         }
 
@@ -55,7 +58,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        String url = "http://192.168.1.64:8000/api/users/login/";
+        String apiUrl = getString(R.string.apiUrl);
+        String url = apiUrl + "users/login/";
         JSONObject jsonBody = new JSONObject();
         try {
             jsonBody.put("email", emailText);
@@ -78,10 +82,8 @@ public class MainActivity extends AppCompatActivity {
                                 loginResponse.getUser().getId()
                         );
 
-                        Toast.makeText(MainActivity.this,
-                                "Bienvenido " + loginResponse.getUser().getFirstName(),
-                                Toast.LENGTH_SHORT).show();
-                        navigateToHome();
+                        // Check if user has a family
+                        checkFamilyStatus();
                     } catch (Exception e) {
                         Log.e("LoginError", "Error parsing response", e);
                         Toast.makeText(MainActivity.this, "Error procesando la respuesta", Toast.LENGTH_SHORT).show();
@@ -107,9 +109,50 @@ public class MainActivity extends AppCompatActivity {
         requestQueue.add(request);
     }
 
+    private void checkFamilyStatus() {
+        String apiUrl = getString(R.string.apiUrl);
+        String url = apiUrl + "users/check-family/";
+
+        JsonObjectRequest request = new JsonObjectRequest(
+                Request.Method.GET, url, null,
+                response -> {
+                    try {
+                        boolean hasFamily = response.getBoolean("has_family");
+                        if (hasFamily) {
+                            navigateToHome();
+                        } else {
+                            navigateToFamilySetup();
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                        Toast.makeText(MainActivity.this, "Error verificando estado de familia", Toast.LENGTH_SHORT).show();
+                    }
+                },
+                error -> {
+                    Toast.makeText(MainActivity.this, "Error verificando familia", Toast.LENGTH_SHORT).show();
+                    Log.e("FamilyCheckError", error.toString());
+                }
+        ) {
+            @Override
+            public Map<String, String> getHeaders() {
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Authorization", "Bearer " + authManager.getAccessToken());
+                return headers;
+            }
+        };
+
+        requestQueue.add(request);
+    }
+
     private void navigateToHome() {
         Intent intent = new Intent(this, fotos.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+        finish();
+    }
+
+    private void navigateToFamilySetup() {
+        Intent intent = new Intent(this, FamilySetupActivity.class);
         startActivity(intent);
         finish();
     }

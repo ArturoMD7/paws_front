@@ -46,6 +46,10 @@ public class AuthManager {
         return sharedPreferences.getInt("user_id", -1);
     }
 
+    public int getFamilyId() {
+        return sharedPreferences.getInt("family_id", -1); // Default to -1 if not found
+    }
+
     public boolean isLoggedIn() {
         return getAccessToken() != null;
     }
