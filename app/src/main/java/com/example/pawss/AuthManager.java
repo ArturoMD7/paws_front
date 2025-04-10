@@ -26,12 +26,17 @@ public class AuthManager {
         }
     }
 
-    public void saveAuthTokens(String accessToken, String refreshToken, int userId) {
+    public void saveAuthTokens(String accessToken, String refreshToken, int userId, int familyId) {
         sharedPreferences.edit()
                 .putString("access_token", accessToken)
                 .putString("refresh_token", refreshToken)
                 .putInt("user_id", userId)
+                .putInt("family_id", familyId)  // Guardamos el family_id
                 .apply();
+    }
+
+    public int getFamilyId() {
+        return sharedPreferences.getInt("family_id", -1);
     }
 
     public String getAccessToken() {
@@ -46,9 +51,6 @@ public class AuthManager {
         return sharedPreferences.getInt("user_id", -1);
     }
 
-    public int getFamilyId() {
-        return sharedPreferences.getInt("family_id", -1); // Default to -1 if not found
-    }
 
     public boolean isLoggedIn() {
         return getAccessToken() != null;
