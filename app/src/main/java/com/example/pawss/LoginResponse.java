@@ -9,4 +9,5 @@ public class LoginResponse {
     public String getAccess() { return access; }
     public String getRefresh() { return refresh; }
     public User getUser() { return user; }
+
 }

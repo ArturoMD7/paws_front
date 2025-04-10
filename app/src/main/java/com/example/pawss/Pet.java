@@ -12,7 +12,8 @@ public class Pet {
     private String photoUrl;
     private String vaccinesUrl;
     private String urlApi;
-    private int ownerId;  // Nuevo campo para el ID del dueño
+    private int ownerId;
+    private int familyId;
 
     public Pet(Context context, int id, String name, String type, int age, String breed,
                String adoptionDate, String photoUrl, String vaccinesUrl) {
@@ -27,7 +28,7 @@ public class Pet {
         this.urlApi = context.getString(R.string.Url);
     }
 
-    // Getters mejorados para manejar URLs
+    // Getters
     public int getId() { return id; }
     public String getName() { return name; }
     public String getType() { return type; }
@@ -35,25 +36,30 @@ public class Pet {
     public String getBreed() { return breed; }
     public String getAdoptionDate() { return adoptionDate; }
     public int getOwnerId() { return ownerId; }
+    public int getFamilyId() { return familyId; }
 
     public String getPhotoUrl() {
         if (photoUrl != null && !photoUrl.isEmpty()) {
-            if (!photoUrl.startsWith("http")) {
-                String cleanPath = photoUrl.startsWith("/") ? photoUrl.substring(1) : photoUrl;
-                return urlApi + "media/" + cleanPath;
+            // Si la URL ya es completa (empieza con http), la devolvemos tal cual
+            if (photoUrl.startsWith("http")) {
+                return photoUrl;
             }
-            return photoUrl;
+            // Si no, construimos la URL completa
+            String cleanPath = photoUrl.startsWith("/") ? photoUrl.substring(1) : photoUrl;
+            return urlApi + "media/" + cleanPath;
         }
         return null;
     }
 
     public String getVaccinesUrl() {
         if (vaccinesUrl != null && !vaccinesUrl.isEmpty()) {
-            if (!vaccinesUrl.startsWith("http")) {
-                String cleanPath = vaccinesUrl.startsWith("/") ? vaccinesUrl.substring(1) : vaccinesUrl;
-                return urlApi + "media/" + cleanPath;
+            // Si la URL ya es completa (empieza con http), la devolvemos tal cual
+            if (vaccinesUrl.startsWith("http")) {
+                return vaccinesUrl;
             }
-            return vaccinesUrl;
+            // Si no, construimos la URL completa
+            String cleanPath = vaccinesUrl.startsWith("/") ? vaccinesUrl.substring(1) : vaccinesUrl;
+            return urlApi + "media/" + cleanPath;
         }
         return null;
     }

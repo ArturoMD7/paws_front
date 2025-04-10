@@ -79,7 +79,8 @@ public class MainActivity extends AppCompatActivity {
                         authManager.saveAuthTokens(
                                 loginResponse.getAccess(),
                                 loginResponse.getRefresh(),
-                                loginResponse.getUser().getId()
+                                loginResponse.getUser().getId(),
+                                loginResponse.getUser().getFamilyId()
                         );
 
                         // Check if user has a family

@@ -74,6 +74,7 @@ public class pets extends BaseActivity {
     private Uri imageUri, vaccineUri;
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final int PICK_VACCINE_FILE_REQUEST = 2;
+    private String getFamilyId;
 
 
     @Override
@@ -92,6 +93,7 @@ public class pets extends BaseActivity {
 
         authManager = new AuthManager(this);
         requestQueue = Volley.newRequestQueue(this);
+        int familyId = authManager.getFamilyId();
 
         if (!authManager.isLoggedIn()) {
             Toast.makeText(this, "Debe iniciar sesión primero", Toast.LENGTH_SHORT).show();
@@ -150,49 +152,71 @@ public class pets extends BaseActivity {
         String apiUrl = getString(R.string.apiUrl);
         String url = apiUrl + "pets/";
 
+        Log.d("PetLoad", "Fetching pets from: " + url);
+        Log.d("PetLoad", "Current user family ID: " + authManager.getFamilyId());
+
         StringRequest request = new StringRequest(Request.Method.GET, url,
                 response -> {
+                    Log.d("PetLoad", "Raw API response: " + response);
                     try {
                         JSONArray petsArray = new JSONArray(response);
                         petList.clear();
 
-                        // Primero obtener la familia del usuario
-                        int familyId = getFamilyId(); // Implementa este método según tu lógica
+                        int familyId = authManager.getFamilyId();
+                        Log.d("PetLoad", "Filtering for family ID: " + familyId);
 
                         for (int i = 0; i < petsArray.length(); i++) {
                             JSONObject petJson = petsArray.getJSONObject(i);
-                            JSONObject ownerJson = petJson.getJSONObject("owner");
-                            int ownerFamilyId = ownerJson.getInt("family_id"); // Asume que el dueño tiene family_id
+                            int petFamilyId = petJson.optInt("family", -1);
+                            Log.d("PetLoad", "Pet ID: " + petJson.getInt("id") +
+                                    ", Family ID: " + petFamilyId +
+                                    ", Name: " + petJson.getString("name"));
 
-                            // Solo agregar mascotas de la misma familia
-                            if (ownerFamilyId == familyId) {
+
                                 Pet pet = new Pet(
-                                        this,
+                                        pets.this,
                                         petJson.getInt("id"),
                                         petJson.getString("name"),
-                                        petJson.getString("pet_type"),
+                                        petJson.getString("pet_type_display"),
                                         petJson.getInt("age"),
                                         petJson.getString("breed"),
                                         petJson.optString("adoption_date", ""),
-                                        petJson.optString("photo", ""),
-                                        petJson.optString("vaccines", "")
+                                        petJson.optString("photo_url", ""),
+                                        petJson.optString("vaccines_url", "")
                                 );
                                 petList.add(pet);
+
+                        }
+
+                        Log.d("PetLoad", "Final pet list size: " + petList.size());
+                        runOnUiThread(() -> {
+                            petAdapter.notifyDataSetChanged();
+                            if (petList.isEmpty()) {
+                                Toast.makeText(pets.this,
+                                        "No hay mascotas registradas",
+                                        Toast.LENGTH_SHORT).show();
                             }
-                        }
+                        });
 
-                        petAdapter.notifyDataSetChanged();
-
-                        if (petList.isEmpty()) {
-                            Toast.makeText(this, "No hay mascotas registradas en tu familia", Toast.LENGTH_SHORT).show();
-                        }
                     } catch (JSONException e) {
                         Log.e("PetLoad", "Error parsing JSON", e);
-                        Toast.makeText(this, "Error al procesar mascotas", Toast.LENGTH_SHORT).show();
+                        runOnUiThread(() ->
+                                Toast.makeText(pets.this,
+                                        "Error al procesar mascotas",
+                                        Toast.LENGTH_SHORT).show());
                     }
                 },
                 error -> {
-                    // Manejo de errores
+                    String errorMessage = "Error al cargar mascotas";
+                    if (error.networkResponse != null && error.networkResponse.data != null) {
+                        errorMessage += ": " + new String(error.networkResponse.data);
+                    }
+                    Log.e("PetLoad", errorMessage, error);
+                    String finalErrorMessage = errorMessage;
+                    runOnUiThread(() ->
+                            Toast.makeText(pets.this,
+                                    finalErrorMessage,
+                                    Toast.LENGTH_LONG).show());
                 }) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
@@ -502,6 +526,8 @@ public class pets extends BaseActivity {
         tvPetType.setText("Tipo: " + pet.getType());
         tvPetAge.setText("Edad: " + pet.getAge() + " años");
         tvPetBreed.setText("Raza: " + pet.getBreed());
+
+
 
         String imageUrl = pet.getPhotoUrl();
         if (imageUrl != null && !imageUrl.isEmpty()) {
