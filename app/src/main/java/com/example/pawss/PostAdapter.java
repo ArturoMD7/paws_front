@@ -50,7 +50,7 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
     }
 
     class PostViewHolder extends RecyclerView.ViewHolder {
-        private TextView tvPetName, tvContent, tvAuthor, tvDate;
+        private TextView tvPetName, tvContent, tvAuthor, tvDate, tvPetType, tvPetBreed, tvPetAge;
         private ImageView ivPostImage, btnDelete;
 
         public PostViewHolder(@NonNull View itemView) {
@@ -59,6 +59,9 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
             tvContent = itemView.findViewById(R.id.tvContent);
             tvAuthor = itemView.findViewById(R.id.tvAuthor);
             tvDate = itemView.findViewById(R.id.tvDate);
+            tvPetType = itemView.findViewById(R.id.tvPetType);
+            tvPetBreed = itemView.findViewById(R.id.tvPetBreed);
+            tvPetAge = itemView.findViewById(R.id.tvPetAge);
             ivPostImage = itemView.findViewById(R.id.ivPostImage);
             btnDelete = itemView.findViewById(R.id.btnDelete);
 
@@ -82,6 +85,9 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
             tvContent.setText(post.getContent());
             tvAuthor.setText(post.getAuthorName());
             tvDate.setText(post.getCreatedAt());
+            tvPetType.setText(post.getPetType());
+            tvPetBreed.setText(post.getPetBreed());
+            tvPetAge.setText(post.getPetAge() + " años");
 
             if (post.getImageUrls() != null && !post.getImageUrls().isEmpty()) {
                 Picasso.get()

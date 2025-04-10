@@ -250,13 +250,14 @@ public class fotosfamilia extends BaseActivity {
         requestQueue.add(request);
     }
 
-    private Post parsePostFromJson(JSONObject postJson) throws JSONException {
+        private Post parsePostFromJson(JSONObject postJson) throws JSONException {
         int id = postJson.getInt("id");
         String content = postJson.getString("content");
         String postType = postJson.getString("post_type");
         String createdAt = postJson.getString("created_at");
-        int authorId = postJson.getInt("author");
-        String authorName = "Usuario #" + authorId;
+        JSONArray imagesArray2 = postJson.getJSONArray("images");
+        JSONObject firstImage = imagesArray2.getJSONObject(0);
+        String authorName = firstImage.getString("author_name");
 
         // Pet info
         String petName = "";
@@ -275,6 +276,7 @@ public class fotosfamilia extends BaseActivity {
                 petName = "Mascota #" + postJson.getInt("pet");
             }
         }
+
 
         // Images
         List<String> imageUrls = new ArrayList<>();

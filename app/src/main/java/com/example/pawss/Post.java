@@ -63,6 +63,7 @@ public class Post {
             return createdAt;
         }
     }
+
     public String getAuthorName() { return authorName; }
     public String getPetName() { return petName; }
     public List<String> getImageUrls() {
