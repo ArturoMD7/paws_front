@@ -233,6 +233,6 @@
         app:itemIconTint="@drawable/bottom_nav_colors"
         app:itemTextColor="@drawable/bottom_nav_colors"
         app:labelVisibilityMode="labeled"
-        app:elevation="8dp"/>
+        app:elevation="8dp" />
 
 </RelativeLayout>

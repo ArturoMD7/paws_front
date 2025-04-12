@@ -108,13 +108,6 @@ public class pets extends BaseActivity {
         setupRecyclerView();
         loadPets();
 
-        Picasso.setSingletonInstance(
-                new Picasso.Builder(this)
-                        .loggingEnabled(true)
-                        .indicatorsEnabled(BuildConfig.DEBUG)
-                        .build()
-        );
-
     }
 
     private void initializeViews() {
