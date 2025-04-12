@@ -4,9 +4,15 @@ import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
@@ -36,13 +42,19 @@ import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import android.Manifest;
+
 
 public class fotosfamilia extends BaseActivity {
 
@@ -66,6 +78,8 @@ public class fotosfamilia extends BaseActivity {
     // Constants
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final String DEFAULT_POST_TYPE = "UPDATE";
+    private static final int REQUEST_IMAGE_CAMERA = 101;
+    private static final int REQUEST_IMAGE_GALLERY = 102;
 
     @Override
     protected int getLayoutResourceId() {
@@ -79,9 +93,9 @@ public class fotosfamilia extends BaseActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+        super.onCreate(savedInstanceState); // NO pongas setContentView aquí
 
-        // Initialize components
+        // El resto está perfecto
         authManager = new AuthManager(this);
         requestQueue = Volley.newRequestQueue(this);
 
@@ -141,20 +155,104 @@ public class fotosfamilia extends BaseActivity {
     }
 
     private void openImageChooser() {
-        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        startActivityForResult(intent, PICK_IMAGE_REQUEST);
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Seleccionar imagen");
+        builder.setItems(new CharSequence[]{"Tomar foto", "Elegir de galería"}, (dialog, which) -> {
+            switch (which) {
+                case 0:
+                    openCamera();
+                    break;
+                case 1:
+                    openGallery();
+                    break;
+            }
+        });
+        builder.show();
     }
+
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(intent, REQUEST_IMAGE_GALLERY);
+    }
+
+    private void openCamera() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            File photoFile = createImageFile();
+            if (photoFile != null) {
+                imageUri = FileProvider.getUriForFile(
+                        this,
+                        getPackageName() + ".provider",
+                        photoFile
+                );
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
+                startActivityForResult(intent, REQUEST_IMAGE_CAMERA);
+            }
+        }
+    }
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (resultCode == RESULT_OK && data != null && requestCode == PICK_IMAGE_REQUEST) {
-            imageUri = data.getData();
-            ivPostImagePreview.setImageURI(imageUri);
-            ivPostImagePreview.setVisibility(View.VISIBLE);
+        if (resultCode == RESULT_OK) {
+            if (requestCode == REQUEST_IMAGE_GALLERY && data != null) {
+                imageUri = data.getData();
+            }
+
+            if ((requestCode == REQUEST_IMAGE_CAMERA || requestCode == REQUEST_IMAGE_GALLERY) && imageUri != null) {
+                ivPostImagePreview.setImageURI(imageUri);
+                ivPostImagePreview.setVisibility(View.VISIBLE);
+            }
         }
     }
+
+
+    private File createImageFile() {
+        try {
+            String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+            String imageFileName = "JPEG_" + timeStamp + "_";
+            File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+            File image = File.createTempFile(
+                    imageFileName,  /* prefix */
+                    ".jpg",         /* suffix */
+                    storageDir      /* directory */
+            );
+            return image;
+        } catch (IOException e) {
+            e.printStackTrace();
+            showToast("No se pudo crear el archivo de imagen");
+            return null;
+        }
+    }
+
+    private static final int REQUEST_CAMERA_PERMISSION = 100;
+
+    private void checkCameraPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA},
+                    REQUEST_CAMERA_PERMISSION);
+        } else {
+            openCamera();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openCamera();
+            } else {
+                showToast("Se necesita permiso de la cámara para tomar fotos");
+            }
+        }
+    }
+
 
     private void loadPetsForSpinner() {
         String apiUrl = getString(R.string.apiUrl);
@@ -250,13 +348,14 @@ public class fotosfamilia extends BaseActivity {
         requestQueue.add(request);
     }
 
-    private Post parsePostFromJson(JSONObject postJson) throws JSONException {
+        private Post parsePostFromJson(JSONObject postJson) throws JSONException {
         int id = postJson.getInt("id");
         String content = postJson.getString("content");
         String postType = postJson.getString("post_type");
         String createdAt = postJson.getString("created_at");
-        int authorId = postJson.getInt("author");
-        String authorName = "Usuario #" + authorId;
+        JSONArray imagesArray2 = postJson.getJSONArray("images");
+        JSONObject firstImage = imagesArray2.getJSONObject(0);
+        String authorName = firstImage.getString("author_name");
 
         // Pet info
         String petName = "";
@@ -275,6 +374,7 @@ public class fotosfamilia extends BaseActivity {
                 petName = "Mascota #" + postJson.getInt("pet");
             }
         }
+
 
         // Images
         List<String> imageUrls = new ArrayList<>();
@@ -316,6 +416,7 @@ public class fotosfamilia extends BaseActivity {
         VolleyMultipartRequest multipartRequest = createPostRequest(content, selectedPet.getId());
         requestQueue.add(multipartRequest);
     }
+
 
     private boolean validatePostForm(String content, int petPosition) {
         if (content.isEmpty()) {

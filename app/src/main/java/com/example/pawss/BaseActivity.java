@@ -54,25 +54,28 @@ public abstract class BaseActivity extends AppCompatActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         overridePendingTransition(0, 0);
+        finish();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        updateNavigationSelection();
+        if (bottomNav != null) {
+            updateNavigationSelection();
+        }
     }
+
 
     private void updateNavigationSelection() {
         if (bottomNav != null) {
-            int currentItem = getCurrentNavItem();
-            if (lastSelectedItem == null || lastSelectedItem != currentItem) {
-                bottomNav.post(() -> {
-                    bottomNav.setSelectedItemId(currentItem);
-                    lastSelectedItem = currentItem;
-                });
+            try {
+                bottomNav.setSelectedItemId(getCurrentNavItem());
+            } catch (Exception e) {
+                e.printStackTrace(); // evita crash silencioso
             }
         }
     }
+
 
     protected abstract int getLayoutResourceId();
     protected abstract int getCurrentNavItem();

@@ -7,7 +7,6 @@
     android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
     tools:context=".pets">
 
-    <!-- Barra Superior -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -53,7 +52,6 @@
             android:layout_marginStart="16dp"/>
     </LinearLayout>
 
-    <!-- Contenedor principal -->
     <FrameLayout
         android:id="@+id/container"
         android:layout_width="match_parent"
@@ -61,7 +59,6 @@
         android:layout_above="@id/bottom_navigation"
         android:layout_below="@id/topBar">
 
-        <!-- Formulario para agregar mascotas (inicialmente invisible) -->
         <ScrollView
             android:id="@+id/formContainer"
             android:layout_width="match_parent"
@@ -75,7 +72,6 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <!-- Nombre (Requerido) -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -89,7 +85,6 @@
                         android:maxLength="100"/>
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Tipo de mascota (Requerido) -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -103,7 +98,6 @@
                         android:layout_height="wrap_content"/>
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Edad (Requerido) -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -119,7 +113,6 @@
                         android:maxLength="2"/>
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Raza (Requerido) -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -134,7 +127,6 @@
                         android:maxLength="100"/>
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Fecha de adopción (Opcional) -->
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -151,7 +143,6 @@
                         android:inputType="date"/>
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <!-- Botón para seleccionar imagen -->
                 <Button
                     android:id="@+id/btnSelectImage"
                     android:layout_width="match_parent"
@@ -161,7 +152,6 @@
                     android:backgroundTint="@color/primary"
                     android:textColor="@android:color/white"/>
 
-                <!-- Vista previa de la imagen seleccionada -->
                 <ImageView
                     android:id="@+id/ivPetPhotoPreview"
                     android:layout_width="120dp"
@@ -173,7 +163,6 @@
                     android:visibility="gone"
                     android:contentDescription="Vista previa de foto de mascota"/>
 
-                <!-- Botón para seleccionar archivo de vacunas -->
                 <Button
                     android:id="@+id/btnSelectVaccineFile"
                     android:layout_width="match_parent"
@@ -183,7 +172,6 @@
                     android:backgroundTint="@color/primary"
                     android:textColor="@android:color/white"/>
 
-                <!-- Nombre del archivo de vacunas seleccionado -->
                 <TextView
                     android:id="@+id/tvVaccineFileName"
                     android:layout_width="match_parent"
@@ -213,12 +201,13 @@
             </LinearLayout>
         </ScrollView>
 
-        <!-- Lista de mascotas (contenido principal) -->
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvPets"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:padding="8dp"
+            android:clipToPadding="false"
             tools:listitem="@layout/item_fotos"/>
 
     </FrameLayout>

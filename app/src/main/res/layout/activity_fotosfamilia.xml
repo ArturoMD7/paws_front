@@ -6,6 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".fotosfamilia">
 
+    <!-- Barra superior -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -41,71 +42,79 @@
             android:focusable="true"/>
     </LinearLayout>
 
-    <ScrollView
-        android:id="@+id/formContainer"
+    <!-- Contenedor central (ScrollView + RecyclerView) -->
+    <FrameLayout
+        android:id="@+id/container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/topBar"
         android:layout_above="@id/bottom_navigation"
-        android:visibility="gone"
-        android:padding="16dp">
+        android:layout_below="@id/topBar">
 
-        <LinearLayout
+        <!-- Formulario (oculto por defecto) -->
+        <ScrollView
+            android:id="@+id/formContainer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:padding="16dp">
 
-            <EditText
-                android:id="@+id/etPostContent"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="¿Qué quieres compartir con tu familia?"
-                android:inputType="textMultiLine"
-                android:minLines="3"/>
+                android:orientation="vertical">
 
-            <!-- Dentro de tu ScrollView, después del EditText de contenido -->
-            <Spinner
-                android:id="@+id/spPets"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:prompt="@string/select_pet_prompt"/>
+                <EditText
+                    android:id="@+id/etPostContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="¿Qué quieres compartir con tu familia?"
+                    android:inputType="textMultiLine"
+                    android:minLines="3" />
 
-            <Button
-                android:id="@+id/btnSelectImage"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Seleccionar imagen"
-                android:layout_marginTop="8dp"/>
+                <Spinner
+                    android:id="@+id/spPets"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:prompt="@string/select_pet_prompt" />
 
-            <ImageView
-                android:id="@+id/ivPostImagePreview"
-                android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:layout_gravity="center"
-                android:layout_marginTop="8dp"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                android:src="@drawable/photoframe"/>
+                <Button
+                    android:id="@+id/btnSelectImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Seleccionar imagen"
+                    android:layout_marginTop="8dp" />
 
-            <Button
-                android:id="@+id/btnSavePost"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Publicar"
-                android:layout_marginTop="16dp"/>
-        </LinearLayout>
-    </ScrollView>
+                <ImageView
+                    android:id="@+id/ivPostImagePreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:layout_gravity="center"
+                    android:layout_marginTop="8dp"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    android:src="@drawable/photoframe" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvPosts"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_below="@id/topBar"
-        android:layout_above="@id/bottom_navigation"
-        android:clipToPadding="false"
-        android:padding="8dp"/>
+                <Button
+                    android:id="@+id/btnSavePost"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Publicar"
+                    android:layout_marginTop="16dp" />
+            </LinearLayout>
+        </ScrollView>
 
+        <!-- Lista de publicaciones -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvPosts"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"
+            android:clipToPadding="false"
+            tools:listitem="@layout/item_fotos" />
+    </FrameLayout>
+
+    <!-- Barra inferior -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
@@ -116,5 +125,6 @@
         app:itemIconTint="@drawable/bottom_nav_colors"
         app:itemTextColor="@drawable/bottom_nav_colors"
         app:labelVisibilityMode="labeled"
-        app:elevation="8dp"/>
+        app:elevation="8dp" />
+
 </RelativeLayout>
