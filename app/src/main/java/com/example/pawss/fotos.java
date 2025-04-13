@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -18,6 +17,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
@@ -26,9 +26,11 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.squareup.picasso.Picasso;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -71,13 +73,90 @@ public class fotos extends BaseActivity {
         initializeViews();
         setupRecyclerView();
         loadPosts();
+        setupSettingsIcon(); // Añadido para configurar el clic en el icono de ajustes
     }
 
     private void initializeViews() {
-        rvPosts = findViewById(R.id.rvPets); // Asegúrate que este ID existe en activity_fotos.xml
+        rvPosts = findViewById(R.id.rvPets);
         if (rvPosts == null) {
             throw new RuntimeException("RecyclerView con ID rvPosts no encontrado en el layout");
         }
+    }
+
+    private void setupSettingsIcon() {
+        ImageView settingsIcon = findViewById(R.id.settingsIcon);
+        if (settingsIcon != null) {
+            settingsIcon.setOnClickListener(v -> showSettingsMenu());
+        }
+    }
+
+    private void showSettingsMenu() {
+        fetchFamilyCode(familyCode -> {
+            runOnUiThread(() -> {
+                AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("Opciones");
+
+                String message = familyCode != null ?
+                        "Código de familia: " + familyCode + "\n\n¿Qué deseas hacer?" :
+                        "No se pudo obtener el código de familia\n\n¿Qué deseas hacer?";
+
+                builder.setMessage(message);
+
+                if (familyCode != null) {
+                    builder.setNeutralButton("Copiar código", (dialog, which) -> {
+                        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        android.content.ClipData clip = android.content.ClipData.newPlainText("Código de familia", familyCode);
+                        clipboard.setPrimaryClip(clip);
+                        showToast("Código copiado al portapapeles");
+                    });
+                }
+
+                builder.setPositiveButton("Cerrar sesión", (dialog, which) -> {
+                    authManager.clearAuth();
+                    Intent intent = new Intent(fotos.this, MainActivity.class);
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(intent);
+                    finish();
+                });
+
+                builder.setNegativeButton("Cancelar", null);
+
+                builder.create().show();
+            });
+        });
+    }
+
+    private void fetchFamilyCode(FamilyCodeCallback callback) {
+        String apiUrl = getString(R.string.apiUrl);
+        String url = apiUrl + "families/";
+
+        StringRequest request = new StringRequest(Request.Method.GET, url,
+                response -> {
+                    try {
+                        JSONArray familiesArray = new JSONArray(response);
+                        if (familiesArray.length() > 0) {
+                            JSONObject family = familiesArray.getJSONObject(0);
+                            String codeFam = family.getString("codeFam");
+                            callback.onFamilyCodeReceived(codeFam);
+                        } else {
+                            callback.onFamilyCodeReceived(null);
+                        }
+                    } catch (JSONException e) {
+                        Log.e("FamilyError", "Error parsing family data", e);
+                        callback.onFamilyCodeReceived(null);
+                    }
+                },
+                error -> {
+                    Log.e("FamilyError", "Error loading family data", error);
+                    callback.onFamilyCodeReceived(null);
+                }) {
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                return createAuthHeaders();
+            }
+        };
+
+        requestQueue.add(request);
     }
 
     private void setupRecyclerView() {
@@ -133,7 +212,6 @@ public class fotos extends BaseActivity {
 
         requestQueue.add(request);
     }
-
 
     private Post parsePostFromJson(JSONObject postJson) throws JSONException {
         int id = postJson.getInt("id");
@@ -300,7 +378,6 @@ public class fotos extends BaseActivity {
                 .show();
     }
 
-    // Helper methods
     private Map<String, String> createAuthHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", "Bearer " + authManager.getAccessToken());
@@ -309,5 +386,9 @@ public class fotos extends BaseActivity {
 
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
+    interface FamilyCodeCallback {
+        void onFamilyCodeReceived(String familyCode);
     }
 }

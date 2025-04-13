@@ -80,7 +80,8 @@ public class MainActivity extends AppCompatActivity {
                                 loginResponse.getAccess(),
                                 loginResponse.getRefresh(),
                                 loginResponse.getUser().getId(),
-                                loginResponse.getUser().getFamilyId()
+                                loginResponse.getUser().getFamilyId(),
+                                loginResponse.getUser().getFirstName() + " " + loginResponse.getUser().getLastName()
                         );
 
                         // Check if user has a family
