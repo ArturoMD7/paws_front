@@ -3,6 +3,7 @@ package com.example.pawss;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -19,6 +20,7 @@ import android.widget.Spinner;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import androidx.annotation.RequiresApi;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -29,6 +31,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
@@ -37,6 +40,10 @@ import org.json.JSONObject;
 
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -44,6 +51,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 
 public class recordatorios extends BaseActivity {
 
@@ -300,7 +308,10 @@ public class recordatorios extends BaseActivity {
                         reminderList.clear();
                         for (int i = 0; i < response.length(); i++) {
                             JSONObject reminderJson = response.getJSONObject(i);
-                            Reminder reminder = parseReminderFromJson(reminderJson);
+                            Reminder reminder = null;
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                reminder = parseReminderFromJson(reminderJson);
+                            }
                             reminderList.add(reminder);
                         }
                         reminderAdapter.notifyDataSetChanged();
@@ -329,15 +340,25 @@ public class recordatorios extends BaseActivity {
         requestQueue.add(request);
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     private Reminder parseReminderFromJson(JSONObject json) throws JSONException {
         Reminder reminder = new Reminder();
         reminder.id = json.getInt("id");
         reminder.title = json.getString("title");
         reminder.description = json.getString("description");
-        reminder.dueDate = json.getString("due_date");
         reminder.isRecurring = json.getBoolean("is_recurring");
         reminder.recurrenceType = json.getString("recurrence_type");
         reminder.recurrenceValue = json.getInt("recurrence_value");
+        String dueDateRaw = json.getString("due_date");
+        try {
+            OffsetDateTime offsetDateTime = OffsetDateTime.parse(dueDateRaw);
+            LocalDateTime localDateTime = offsetDateTime.toLocalDateTime();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+            reminder.dueDate = localDateTime.format(formatter);
+        } catch (DateTimeParseException e) {
+            Log.e("Recordatorios", "Error al parsear la fecha: " + dueDateRaw);
+            reminder.dueDate = dueDateRaw; // Fallback si falla
+        }
 
         // Handle pet data
         if (!json.isNull("pet")) {
@@ -460,6 +481,9 @@ public class recordatorios extends BaseActivity {
             return;
         }
 
+        SimpleDateFormat apiDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
+        apiDateFormat.setTimeZone(TimeZone.getTimeZone("America/Mexico_City"));
+
         try {
             JSONObject requestBody = new JSONObject();
             requestBody.put("title", title);
@@ -577,12 +601,19 @@ public class recordatorios extends BaseActivity {
                 .setPositiveButton("Eliminar", (dialog, which) -> {
                     String url = getString(R.string.apiUrl) + "reminders/" + reminder.getId() + "/";
 
-                    JsonObjectRequest request = new JsonObjectRequest(Request.Method.DELETE, url, null,
+                    StringRequest request = new StringRequest(Request.Method.DELETE, url,
                             response -> {
                                 Toast.makeText(recordatorios.this, "Recordatorio eliminado", Toast.LENGTH_SHORT).show();
                                 loadReminders();
                             },
-                            error -> Toast.makeText(recordatorios.this, "Error al eliminar recordatorio", Toast.LENGTH_SHORT).show()
+                            error -> {
+                                String errorMsg = "Error al eliminar recordatorio";
+                                if (error.networkResponse != null && error.networkResponse.data != null) {
+                                    errorMsg += ": " + new String(error.networkResponse.data);
+                                }
+                                Log.e("Recordatorios", errorMsg, error);
+                                Toast.makeText(recordatorios.this, errorMsg, Toast.LENGTH_LONG).show();
+                            }
                     ) {
                         @Override
                         public Map<String, String> getHeaders() throws AuthFailureError {
@@ -593,8 +624,10 @@ public class recordatorios extends BaseActivity {
                     };
 
                     requestQueue.add(request);
+
                 })
-                .setNegativeButton("Cancelar", null)
+                .setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss())
                 .show();
     }
+
 }
