@@ -7,11 +7,11 @@
 
     <ImageView
         android:id="@+id/ivPetPhoto"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="328dp"
+        android:layout_height="315dp"
         android:layout_gravity="center_horizontal"
         android:scaleType="centerCrop"
-        android:src="@drawable/photoframe"/>
+        android:src="@drawable/photoframe" />
 
     <TextView
         android:id="@+id/tvPetName"
@@ -57,6 +57,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:text="Ver Cartilla de Vacunación"
-        android:backgroundTint="?attr/colorPrimary"
+        android:backgroundTint="@color/primary"
         android:textColor="@android:color/white"/>
 </LinearLayout>

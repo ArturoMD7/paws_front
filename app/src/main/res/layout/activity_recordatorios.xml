@@ -7,6 +7,7 @@
     android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
     tools:context=".recordatorios">
 
+    <!-- Top Bar -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -42,148 +43,160 @@
             android:focusable="true"/>
     </LinearLayout>
 
-    <!-- Contenedor del formulario para añadir recordatorios (inicialmente oculto) -->
-    <ScrollView
-        android:id="@+id/formContainer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/topBar"
-        android:visibility="gone"
-        android:padding="16dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <EditText
-                android:id="@+id/etReminderTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Título del recordatorio"
-                android:inputType="textCapSentences"/>
-
-            <EditText
-                android:id="@+id/etReminderDescription"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Descripción"
-                android:inputType="textCapSentences"
-                android:layout_marginTop="8dp"/>
-
-            <Spinner
-                android:id="@+id/spFamilyMembers"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"/>
-
-            <Spinner
-                android:id="@+id/spPets"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"/>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp">
-
-                <RadioGroup
-                    android:id="@+id/rgReminderType"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <RadioButton
-                        android:id="@+id/rbOneTime"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Una vez"
-                        android:checked="true"/>
-
-                    <RadioButton
-                        android:id="@+id/rbRecurring"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Repetir"
-                        android:layout_marginStart="16dp"/>
-                </RadioGroup>
-            </LinearLayout>
-
-            <!-- Contenedor para fecha y hora (siempre visible) -->
-            <LinearLayout
-                android:id="@+id/llDateTime"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginTop="8dp">
-
-                <Button
-                    android:id="@+id/btnSelectDate"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Seleccionar fecha"
-                    android:layout_marginTop="8dp"/>
-
-                <Button
-                    android:id="@+id/btnSelectTime"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Seleccionar hora"
-                    android:layout_marginTop="8dp"/>
-            </LinearLayout>
-
-            <!-- Contenedor para opciones de repetición (inicialmente oculto) -->
-            <LinearLayout
-                android:id="@+id/llRecurringOptions"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginTop="8dp"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Repetir cada:"
-                    android:textStyle="bold"/>
-
-                <Spinner
-                    android:id="@+id/spRecurrenceType"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"/>
-
-                <EditText
-                    android:id="@+id/etRecurrenceValue"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="Valor (ej. 1, 2, etc.)"
-                    android:inputType="number"
-                    android:layout_marginTop="8dp"/>
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/btnSaveReminder"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Guardar recordatorio"
-                android:layout_marginTop="16dp"/>
-        </LinearLayout>
-    </ScrollView>
-
-    <!-- Lista de recordatorios -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvReminders"
+    <!-- Contenedor principal para formulario y lista -->
+    <FrameLayout
+        android:id="@+id/mainContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_below="@id/topBar"
-        android:layout_above="@id/bottom_navigation"
-        android:padding="8dp"/>
+        android:layout_above="@id/bottom_navigation">
+
+        <!-- Lista de recordatorios (visible por defecto) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvReminders"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="8dp"/>
+
+        <!-- Formulario para añadir recordatorios (inicialmente oculto) -->
+        <ScrollView
+            android:id="@+id/formContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            android:fillViewport="true"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <EditText
+                    android:id="@+id/etReminderTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Título del recordatorio"
+                    android:inputType="textCapSentences"/>
+
+                <EditText
+                    android:id="@+id/etReminderDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Descripción"
+                    android:inputType="textCapSentences"
+                    android:layout_marginTop="8dp"/>
+
+                <Spinner
+                    android:id="@+id/spFamilyMembers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"/>
+
+                <Spinner
+                    android:id="@+id/spPets"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"/>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <RadioGroup
+                        android:id="@+id/rgReminderType"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/rbOneTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Una vez"
+                            android:checked="true"/>
+
+                        <RadioButton
+                            android:id="@+id/rbRecurring"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Repetir"
+                            android:layout_marginStart="16dp"/>
+                    </RadioGroup>
+                </LinearLayout>
+
+                <!-- Contenedor para fecha y hora -->
+                <LinearLayout
+                    android:id="@+id/llDateTime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp">
+
+                    <Button
+                        android:id="@+id/btnSelectDate"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Seleccionar fecha"
+                        android:textColor="@color/black"
+                        android:layout_marginTop="8dp"/>
+
+                    <Button
+                        android:id="@+id/btnSelectTime"
+                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/black"
+                        android:text="Seleccionar hora"
+                        android:layout_marginTop="8dp"/>
+                </LinearLayout>
+
+                <!-- Contenedor para opciones de repetición (inicialmente oculto) -->
+                <LinearLayout
+                    android:id="@+id/llRecurringOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Repetir cada:"
+                        android:textStyle="bold"/>
+
+                    <Spinner
+                        android:id="@+id/spRecurrenceType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"/>
+
+                    <EditText
+                        android:id="@+id/etRecurrenceValue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Valor (ej. 1, 2, etc.)"
+                        android:inputType="number"
+                        android:layout_marginTop="8dp"/>
+                </LinearLayout>
+
+                <!-- Botón de guardar con margen inferior para evitar que quede oculto -->
+                <Button
+                    android:id="@+id/btnSaveReminder"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Guardar recordatorio"
+                    android:backgroundTint="@color/primary"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="72dp"/> <!-- Margen adicional para el teclado -->
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
 
     <!-- Barra de navegación inferior -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
