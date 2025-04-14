@@ -143,7 +143,7 @@ public class recordatorios extends BaseActivity {
         setupListeners();
         setupRecyclerView();
         setupRecurrenceSpinner();
-        loadFamilyMembers();
+        loadFamilyMembers(() -> loadPets(() -> loadReminders()));
         loadPets();
         loadReminders();
     }
@@ -465,12 +465,18 @@ public class recordatorios extends BaseActivity {
     }
 
 
-    private void loadFamilyMembers() {
+    private void loadFamilyMembers(Runnable onComplete) {
         String url = getString(R.string.apiUrl) + "families";
 
         JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
-                this::handleFamilyMembersResponse,
-                this::handleFamilyMembersError) {
+                response -> {
+                    handleFamilyMembersResponse(response);
+                    if (onComplete != null) onComplete.run();
+                },
+                error -> {
+                    handleFamilyMembersError(error);
+                    if (onComplete != null) onComplete.run();
+                }) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
                 return createAuthHeaders();
@@ -479,6 +485,29 @@ public class recordatorios extends BaseActivity {
 
         requestQueue.add(request);
     }
+
+    private void loadPets(Runnable onComplete) {
+        String url = getString(R.string.apiUrl) + "pets/";
+
+        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
+                response -> {
+                    handlePetsResponse(response);
+                    if (onComplete != null) onComplete.run();
+                },
+                error -> {
+                    handlePetsError(error);
+                    if (onComplete != null) onComplete.run();
+                }) {
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                return createAuthHeaders();
+            }
+        };
+
+        requestQueue.add(request);
+    }
+
+
 
     private void handleFamilyMembersResponse(JSONArray response) {
         try {
@@ -652,31 +681,22 @@ public class recordatorios extends BaseActivity {
             // Manejar usuario asignado
             if (!json.isNull("assigned_to")) {
                 int assignedToId = json.getInt("assigned_to");
-                JSONObject assignedToJson = json.optJSONObject("assigned_to_user");
+                String assignedToName = "Usuario #" + assignedToId;
 
-                if (assignedToJson != null) {
-                    // Si viene el objeto completo del usuario
-                    Reminder.FamilyMember member = new Reminder.FamilyMember();
-                    member.id = assignedToId;
-                    member.name = assignedToJson.getString("first_name") + " " +
-                            assignedToJson.getString("last_name");
-                    reminder.assignedTo = member;
-                } else {
-                    // Si solo viene el ID, buscar en la lista de miembros
-                    boolean encontrado = false;
-                    for (Reminder.FamilyMember member : availableFamilyMembers) {
-                        if (member.id == assignedToId) {
-                            reminder.assignedTo = member;
-                            encontrado = true;
-                            break;
-                        }
+                // Intentar encontrarlo en la lista de miembros ya cargados
+                for (Reminder.FamilyMember member : availableFamilyMembers) {
+                    if (member.id == assignedToId) {
+                        reminder.assignedTo = member;
+                        break;
                     }
-                    if (!encontrado) {
-                        Reminder.FamilyMember unknown = new Reminder.FamilyMember();
-                        unknown.id = assignedToId;
-                        unknown.name = "Usuario #" + assignedToId;
-                        reminder.assignedTo = unknown;
-                    }
+                }
+
+                // Si no estaba en la lista, crearlo manualmente
+                if (reminder.assignedTo == null) {
+                    Reminder.FamilyMember fallback = new Reminder.FamilyMember();
+                    fallback.id = assignedToId;
+                    fallback.name = assignedToName;
+                    reminder.assignedTo = fallback;
                 }
             } else {
                 Reminder.FamilyMember todos = new Reminder.FamilyMember();
@@ -685,7 +705,7 @@ public class recordatorios extends BaseActivity {
                 reminder.assignedTo = todos;
             }
 
-            // Manejar mascota
+// Manejar mascota
             if (!json.isNull("pet")) {
                 if (json.get("pet") instanceof JSONObject) {
                     JSONObject petJson = json.getJSONObject("pet");
@@ -696,16 +716,26 @@ public class recordatorios extends BaseActivity {
                     reminder.pet = pet;
                 } else {
                     int petId = json.getInt("pet");
+                    boolean found = false;
+
                     for (Reminder.Pet pet : availablePets) {
                         if (pet.id == petId) {
                             reminder.pet = pet;
+                            found = true;
                             break;
                         }
+                    }
+
+                    if (!found) {
+                        Reminder.Pet unknown = new Reminder.Pet();
+                        unknown.id = petId;
+                        unknown.name = "Mascota #" + petId;
+                        unknown.photoUrl = null;
+                        reminder.pet = unknown;
                     }
                 }
             }
 
-            // ... resto del código ...
         } catch (JSONException e) {
             Log.e("Recordatorios", "Error parsing reminder JSON", e);
             return null;
