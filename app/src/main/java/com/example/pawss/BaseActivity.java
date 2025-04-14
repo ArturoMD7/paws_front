@@ -86,7 +86,6 @@ public abstract class BaseActivity extends AppCompatActivity {
         map.put(R.id.nav_fotosfamilia, fotosfamilia.class);
         map.put(R.id.nav_pets, pets.class);
         map.put(R.id.nav_recordatorios, recordatorios.class);
-        map.put(R.id.nav_notification, notification.class);
         return map;
     }
 }

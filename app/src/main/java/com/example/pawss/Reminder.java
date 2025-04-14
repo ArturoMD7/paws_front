@@ -34,6 +34,9 @@ public class Reminder {
     @SerializedName("family_member_details")
     FamilyMember assignedTo;
 
+    @SerializedName("status") // Nuevo campo añadido
+    String status;
+
     // Formateador de fecha para mostrar en la UI
     private static final SimpleDateFormat displayFormat =
             new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
@@ -50,6 +53,10 @@ public class Reminder {
     public int getRecurrenceValue() { return recurrenceValue; }
     public Pet getPet() { return pet; }
     public FamilyMember getAssignedTo() { return assignedTo; }
+    public String getStatus() {
+        return status;
+    }
+
 
     // Método para obtener la fecha formateada para mostrar
     public String getFormattedDateTime() {
@@ -61,14 +68,18 @@ public class Reminder {
         }
     }
 
-    // Método para obtener el nombre del destinatario
     public String getAssignedToName() {
-        return assignedTo != null ? assignedTo.name : "Todos";
+        if (assignedTo != null) {
+            return assignedTo.name;
+        }
+        return "Todos los miembros";
     }
 
-    // Método para obtener el nombre de la mascota
     public String getPetName() {
-        return pet != null ? pet.name : "Ninguna";
+        if (pet != null) {
+            return pet.name;
+        }
+        return "Sin mascota";
     }
 
     // Clase interna para mascotas

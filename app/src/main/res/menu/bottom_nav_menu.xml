@@ -24,9 +24,4 @@
         android:title="Recordatorios"
         android:enabled="true"/>
 
-    <item
-        android:id="@+id/nav_notification"
-        android:icon="@drawable/notification"
-        android:title="Notificaciones"
-        android:enabled="true"/>
 </menu>

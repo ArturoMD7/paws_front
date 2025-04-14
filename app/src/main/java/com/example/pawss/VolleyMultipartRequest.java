@@ -161,7 +161,7 @@ public class VolleyMultipartRequest extends Request<NetworkResponse> {
         dataOutputStream.writeBytes(lineEnd);
     }
 
-    public class DataPart {
+    public static class DataPart {
         private String fileName;
         private byte[] content;
         private String type;
@@ -184,4 +184,5 @@ public class VolleyMultipartRequest extends Request<NetworkResponse> {
             return type;
         }
     }
+
 }
