@@ -14,7 +14,12 @@ import com.android.volley.toolbox.Volley;
 import com.google.gson.Gson;
 import org.json.JSONException;
 import org.json.JSONObject;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,6 +28,8 @@ public class MainActivity extends AppCompatActivity {
     private Button loginButton, registerButton;
     private AuthManager authManager;
     private RequestQueue requestQueue;
+    private static final int REQUEST_PERMISSIONS_CODE = 123;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,12 +49,37 @@ public class MainActivity extends AppCompatActivity {
         password = findViewById(R.id.passwordEditText);
         loginButton = findViewById(R.id.loginButton);
         registerButton = findViewById(R.id.registerButton);
+        requestNecessaryPermissions();
 
         loginButton.setOnClickListener(v -> performLogin());
         registerButton.setOnClickListener(v -> {
             startActivity(new Intent(MainActivity.this, register.class));
         });
     }
+
+    private void requestNecessaryPermissions() {
+        String[] permissions = {
+                Manifest.permission.CAMERA,
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.READ_MEDIA_IMAGES
+        };
+
+        // Lista de permisos que aún no han sido concedidos
+        ArrayList<String> permissionsToRequest = new ArrayList<>();
+        for (String permission : permissions) {
+            if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(permission);
+            }
+        }
+
+        if (!permissionsToRequest.isEmpty()) {
+            ActivityCompat.requestPermissions(this,
+                    permissionsToRequest.toArray(new String[0]),
+                    REQUEST_PERMISSIONS_CODE);
+        }
+    }
+
 
     private void performLogin() {
         String emailText = email.getText().toString().trim();
