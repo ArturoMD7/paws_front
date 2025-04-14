@@ -1,10 +1,22 @@
 package com.example.pawss;
 
+import static android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM;
+
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.PendingIntent;
+import android.app.ProgressDialog;
 import android.app.TimePickerDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -21,14 +33,16 @@ import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
+import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.volley.AuthFailureError;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response;
 import com.android.volley.VolleyError;
+import com.android.volley.toolbox.HttpHeaderParser;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.StringRequest;
@@ -38,11 +52,14 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -82,6 +99,12 @@ public class recordatorios extends BaseActivity {
     private AuthManager authManager;
     private RequestQueue requestQueue;
 
+    private static final int REQUEST_REMINDER_PHOTO = 1001;
+    private static final int REQUEST_CAMERA_PERMISSION = 1002;
+    private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 1003;
+    private Integer pendingReminderId = null;
+
+
     @Override
     protected int getLayoutResourceId() {
         return R.layout.activity_recordatorios;
@@ -96,8 +119,22 @@ public class recordatorios extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+
+        if (getIntent() != null && "COMPLETE_REMINDER".equals(getIntent().getAction())) {
+            int reminderId = getIntent().getIntExtra("reminderId", -1);
+            if (reminderId != -1) {
+                pendingReminderId = reminderId;
+            }
+            getIntent().removeExtra("reminderId");
+            getIntent().setAction(null);
+        }
+
+
+
+
         authManager = new AuthManager(this);
         requestQueue = Volley.newRequestQueue(this);
+
 
         initializeViews();
         setupListeners();
@@ -156,8 +193,50 @@ public class recordatorios extends BaseActivity {
             public void onDeleteReminder(Reminder reminder) {
                 deleteReminder(reminder);
             }
+
+            @Override
+            public void onCompleteReminder(Reminder reminder) {
+                showCompleteReminderDialog(reminder.getId());
+            }
         });
-        rvReminders.setAdapter(reminderAdapter);
+        rvReminders.setAdapter(reminderAdapter); // Faltaba esta línea
+    }
+
+    private void completeReminder(int reminderId) {
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Completando recordatorio...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        String url = getString(R.string.apiUrl) + "reminders/" + reminderId + "/complete/";
+
+        JsonObjectRequest request = new JsonObjectRequest(
+                Request.Method.POST,
+                url,
+                null,
+                response -> {
+                    progressDialog.dismiss();
+                    Toast.makeText(this, "Recordatorio completado", Toast.LENGTH_SHORT).show();
+                    loadReminders();
+                },
+                error -> {
+                    progressDialog.dismiss();
+                    String errorMsg = "Error al completar recordatorio";
+                    if (error.networkResponse != null && error.networkResponse.data != null) {
+                        errorMsg += ": " + new String(error.networkResponse.data);
+                    }
+                    Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
+                }
+        ) {
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Authorization", "Bearer " + authManager.getAccessToken());
+                return headers;
+            }
+        };
+
+        requestQueue.add(request);
     }
 
     private void setupRecurrenceSpinner() {
@@ -168,71 +247,139 @@ public class recordatorios extends BaseActivity {
         spRecurrenceType.setAdapter(adapter);
     }
 
-    private void loadFamilyMembers() {
-        String url = getString(R.string.apiUrl) + "families";
+    private void showCompleteReminderDialog(int reminderId) {
+        getIntent().setAction("");
+        getIntent().removeExtra("reminderId");
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Completar recordatorio");
 
-        Log.d("Recordatorios", "Loading family members from: " + url);
+        View view = getLayoutInflater().inflate(R.layout.dialog_complete_reminder, null);
+        ImageView ivPhoto = view.findViewById(R.id.ivPhoto);
+        Button btnTakePhoto = view.findViewById(R.id.btnTakePhoto);
 
-        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+
+        btnTakePhoto.setOnClickListener(v -> {
+            try {
+                openCameraForReminder(reminderId);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void openCameraForReminder(int reminderId) throws IOException {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) != null) {
+            File photoFile = createImageFile();
+            if (photoFile != null) {
+                Uri photoUri = FileProvider.getUriForFile(
+                        this,
+                        getPackageName() + ".provider",
+                        photoFile
+                );
+
+                // Guardar temporalmente el reminderId y la URI
+                SharedPreferences prefs = getSharedPreferences("TempReminder", MODE_PRIVATE);
+                prefs.edit()
+                        .putInt("currentReminderId", reminderId)
+                        .putString("photoUri", photoUri.toString())
+                        .apply();
+
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
+                startActivityForResult(intent, REQUEST_REMINDER_PHOTO);
+            }
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
+        String imageFileName = "JPEG_" + timeStamp + "_";
+        File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+        return File.createTempFile(
+                imageFileName,  /* prefix */
+                ".jpg",         /* suffix */
+                storageDir      /* directory */
+        );
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_REMINDER_PHOTO && resultCode == RESULT_OK) {
+            SharedPreferences prefs = getSharedPreferences("TempReminder", MODE_PRIVATE);
+            int reminderId = prefs.getInt("currentReminderId", -1);
+            String photoUriStr = prefs.getString("photoUri", null);
+
+            if (reminderId != -1 && photoUriStr != null) {
+                Uri photoUri = Uri.parse(photoUriStr);
+                uploadReminderCompletion(reminderId, photoUri);
+            }
+
+            // Limpiar preferencias
+            prefs.edit().clear().apply();
+        }
+    }
+
+    private void uploadReminderCompletion(int reminderId, Uri photoUri) {
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        progressDialog.setMessage("Completando recordatorio...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // 1. Crear el mapa de parámetros (si tu backend los requiere)
+        Map<String, String> params = new HashMap<>();
+        params.put("user_id", String.valueOf(authManager.getUserId()));
+
+        // 2. Preparar los datos de la imagen
+        Map<String, VolleyMultipartRequest.DataPart> byteData = new HashMap<>();
+        try {
+            InputStream imageStream = getContentResolver().openInputStream(photoUri);
+            byte[] imageData = getBytes(imageStream);
+
+            // Usar un nombre de archivo único
+            String fileName = "reminder_" + reminderId + "_" + System.currentTimeMillis() + ".jpg";
+            byteData.put("photo", new VolleyMultipartRequest.DataPart(
+                    fileName,
+                    imageData,
+                    "image/jpeg"
+            ));
+        } catch (Exception e) {
+            progressDialog.dismiss();
+            Toast.makeText(this, "Error al procesar la imagen: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        // 3. Configurar la petición
+        VolleyMultipartRequest request = new VolleyMultipartRequest(
+                Request.Method.POST,
+                getString(R.string.apiUrl) + "reminders/" + reminderId + "/complete/",
                 response -> {
-                    Log.d("Recordatorios", "Family members response: " + response.toString());
+                    progressDialog.dismiss();
                     try {
-                        availableFamilyMembers.clear();
-                        List<String> memberNames = new ArrayList<>();
-                        memberNames.add("Selecciona un familiar (Todos verán el recordatorio)");
-
-                        // Agregar opción "Todos"
-                        Reminder.FamilyMember todos = new Reminder.FamilyMember();
-                        todos.id = -1; // Usamos -1 para representar "Todos"
-                        todos.name = "Todos los miembros";
-                        availableFamilyMembers.add(todos);
-                        memberNames.add(todos.name);
-
-                        // Procesar la respuesta de la API
-                        if (response.length() > 0) {
-                            JSONObject family = response.getJSONObject(0); // Primera familia
-                            JSONArray members = family.getJSONArray("members");
-
-                            // Agregar usuario actual primero
-                            Reminder.FamilyMember currentUser = new Reminder.FamilyMember();
-                            currentUser.id = authManager.getUserId();
-                            currentUser.name = "Yo (" + authManager.getUserName() + ")";
-                            availableFamilyMembers.add(currentUser);
-                            memberNames.add(currentUser.name);
-
-                            // Agregar otros miembros de la familia
-                            for (int i = 0; i < members.length(); i++) {
-                                JSONObject member = members.getJSONObject(i);
-                                // Verificar que no sea el usuario actual
-                                if (member.getInt("id") != authManager.getUserId()) {
-                                    Reminder.FamilyMember familyMember = new Reminder.FamilyMember();
-                                    familyMember.id = member.getInt("id");
-                                    familyMember.name = member.getString("first_name") + " " + member.getString("last_name");
-                                    availableFamilyMembers.add(familyMember);
-                                    memberNames.add(familyMember.name);
-                                }
-                            }
-                        }
-
-                        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                                this, android.R.layout.simple_spinner_item, memberNames);
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                        spFamilyMembers.setAdapter(adapter);
-
-                        // Seleccionar "Todos" por defecto
-                        spFamilyMembers.setSelection(1);
-                    } catch (JSONException e) {
-                        Log.e("Recordatorios", "Error parsing family members", e);
-                        Toast.makeText(this, "Error al procesar familiares", Toast.LENGTH_SHORT).show();
+                        String responseString = new String(response.data, "UTF-8");
+                        Log.d("API_RESPONSE", "Respuesta: " + responseString);
+                        Toast.makeText(this, "¡Recordatorio completado!", Toast.LENGTH_SHORT).show();
+                        new Handler().postDelayed(this::loadReminders, 1000);
+                        cancelReminderAlarm(reminderId);
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 },
                 error -> {
-                    String errorMsg = "Error al cargar familiares";
+                    progressDialog.dismiss();
+                    String errorMsg = "Error al completar";
                     if (error.networkResponse != null && error.networkResponse.data != null) {
                         errorMsg += ": " + new String(error.networkResponse.data);
                     }
-                    Log.e("Recordatorios", errorMsg, error);
-                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
+                    Log.e("API_ERROR", errorMsg, error);
+                    Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
                 }
         ) {
             @Override
@@ -240,130 +387,252 @@ public class recordatorios extends BaseActivity {
                 Map<String, String> headers = new HashMap<>();
                 headers.put("Authorization", "Bearer " + authManager.getAccessToken());
                 return headers;
+            }
+        };
+
+        // 4. Asignar los datos a la petición
+        request.setParams(params);
+        request.setByteData(byteData);
+
+        // 5. Agregar timeout y reintentos
+        request.setRetryPolicy(new DefaultRetryPolicy(
+                10000,  // 10 segundos timeout
+                DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                DefaultRetryPolicy.DEFAULT_BACKOFF_MULT
+        ));
+
+        requestQueue.add(request);
+    }
+
+    private byte[] getBytes(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream();
+        int bufferSize = 1024;
+        byte[] buffer = new byte[bufferSize];
+
+        try {
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                byteBuffer.write(buffer, 0, len);
+            }
+            return byteBuffer.toByteArray();
+        } finally {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                Log.e("Reminder", "Error al cerrar el stream", e);
+            }
+            try {
+                byteBuffer.close();
+            } catch (IOException e) {
+                Log.e("Reminder", "Error al cerrar el buffer", e);
+            }
+        }
+    }
+
+
+    private void loadFamilyMembers() {
+        String url = getString(R.string.apiUrl) + "families";
+
+        JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
+                this::handleFamilyMembersResponse,
+                this::handleFamilyMembersError) {
+            @Override
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                return createAuthHeaders();
             }
         };
 
         requestQueue.add(request);
     }
 
+    private void handleFamilyMembersResponse(JSONArray response) {
+        try {
+            availableFamilyMembers.clear();
+            List<String> memberNames = new ArrayList<>();
+            memberNames.add("Selecciona un familiar (Todos verán el recordatorio)");
+
+            // Agregar opción "Todos"
+            Reminder.FamilyMember todos = new Reminder.FamilyMember();
+            todos.id = -1;
+            todos.name = "Todos los miembros";
+            availableFamilyMembers.add(todos);
+            memberNames.add(todos.name);
+
+            if (response.length() > 0) {
+                JSONObject family = response.getJSONObject(0);
+                JSONArray members = family.getJSONArray("members");
+
+                // Agregar usuario actual
+                Reminder.FamilyMember currentUser = new Reminder.FamilyMember();
+                currentUser.id = authManager.getUserId();
+                currentUser.name = "Yo (" + authManager.getUserName() + ")";
+                availableFamilyMembers.add(currentUser);
+                memberNames.add(currentUser.name);
+
+                // Agregar otros miembros
+                for (int i = 0; i < members.length(); i++) {
+                    JSONObject member = members.getJSONObject(i);
+                    if (member.getInt("id") != authManager.getUserId()) {
+                        Reminder.FamilyMember familyMember = new Reminder.FamilyMember();
+                        familyMember.id = member.getInt("id");
+                        familyMember.name = member.getString("first_name") + " " + member.getString("last_name");
+                        availableFamilyMembers.add(familyMember);
+                        memberNames.add(familyMember.name);
+                    }
+                }
+            }
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_item, memberNames);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spFamilyMembers.setAdapter(adapter);
+            spFamilyMembers.setSelection(1);
+        } catch (JSONException e) {
+            Log.e("Recordatorios", "Error parsing family members", e);
+            Toast.makeText(this, "Error al procesar familiares", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleFamilyMembersError(VolleyError error) {
+        String errorMsg = "Error al cargar familiares";
+        if (error.networkResponse != null && error.networkResponse.data != null) {
+            errorMsg += ": " + new String(error.networkResponse.data);
+        }
+        Log.e("Recordatorios", errorMsg, error);
+        Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
+    }
 
     private void loadPets() {
         String url = getString(R.string.apiUrl) + "pets/";
 
-        Log.d("Recordatorios", "Loading pets from: " + url);
-
         JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
-                response -> {
-                    Log.d("Recordatorios", "Pets response: " + response.toString());
-                    try {
-                        availablePets.clear();
-                        List<String> petNames = new ArrayList<>();
-                        petNames.add("Selecciona una mascota");
-
-                        for (int i = 0; i < response.length(); i++) {
-                            JSONObject pet = response.getJSONObject(i);
-                            Reminder.Pet petObj = new Reminder.Pet();
-                            petObj.id = pet.getInt("id");
-                            petObj.name = pet.getString("name");
-                            petObj.photoUrl = pet.optString("photo_url", null);
-                            availablePets.add(petObj);
-                            petNames.add(petObj.name);
-                        }
-
-                        ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                                this, android.R.layout.simple_spinner_item, petNames);
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                        spPets.setAdapter(adapter);
-                    } catch (JSONException e) {
-                        Log.e("Recordatorios", "Error parsing pets", e);
-                        Toast.makeText(this, "Error al procesar mascotas", Toast.LENGTH_SHORT).show();
-                    }
-                },
-                error -> {
-                    String errorMsg = "Error al cargar mascotas";
-                    if (error.networkResponse != null && error.networkResponse.data != null) {
-                        errorMsg += ": " + new String(error.networkResponse.data);
-                    }
-                    Log.e("Recordatorios", errorMsg, error);
-                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
-                }
-        ) {
+                this::handlePetsResponse,
+                this::handlePetsError) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
-                Map<String, String> headers = new HashMap<>();
-                headers.put("Authorization", "Bearer " + authManager.getAccessToken());
-                return headers;
+                return createAuthHeaders();
             }
         };
 
         requestQueue.add(request);
+    }
+
+    private void handlePetsResponse(JSONArray response) {
+        try {
+            availablePets.clear();
+            List<String> petNames = new ArrayList<>();
+            petNames.add("Selecciona una mascota");
+
+            for (int i = 0; i < response.length(); i++) {
+                JSONObject pet = response.getJSONObject(i);
+                Reminder.Pet petObj = new Reminder.Pet();
+                petObj.id = pet.getInt("id");
+                petObj.name = pet.getString("name");
+                petObj.photoUrl = pet.optString("photo_url", null);
+                availablePets.add(petObj);
+                petNames.add(petObj.name);
+            }
+
+            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                    this, android.R.layout.simple_spinner_item, petNames);
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+            spPets.setAdapter(adapter);
+        } catch (JSONException e) {
+            Log.e("Recordatorios", "Error parsing pets", e);
+            Toast.makeText(this, "Error al procesar mascotas", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handlePetsError(VolleyError error) {
+        String errorMsg = "Error al cargar mascotas";
+        if (error.networkResponse != null && error.networkResponse.data != null) {
+            errorMsg += ": " + new String(error.networkResponse.data);
+        }
+        Log.e("Recordatorios", errorMsg, error);
+        Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
     }
 
     private void loadReminders() {
         String url = getString(R.string.apiUrl) + "reminders/";
 
         JsonArrayRequest request = new JsonArrayRequest(Request.Method.GET, url, null,
-                response -> {
-                    try {
-                        reminderList.clear();
-                        for (int i = 0; i < response.length(); i++) {
-                            JSONObject reminderJson = response.getJSONObject(i);
-                            Reminder reminder = null;
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                reminder = parseReminderFromJson(reminderJson);
-                            }
-                            reminderList.add(reminder);
-                        }
-                        reminderAdapter.notifyDataSetChanged();
-                    } catch (JSONException e) {
-                        Log.e("Recordatorios", "Error parsing reminders", e);
-                        Toast.makeText(this, "Error al procesar recordatorios", Toast.LENGTH_SHORT).show();
-                    }
-                },
-                error -> {
-                    String errorMsg = "Error al cargar recordatorios";
-                    if (error.networkResponse != null && error.networkResponse.data != null) {
-                        errorMsg += ": " + new String(error.networkResponse.data);
-                    }
-                    Log.e("Recordatorios", errorMsg, error);
-                    Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
-                }
-        ) {
+                this::handleRemindersResponse,
+                this::handleRemindersError) {
             @Override
             public Map<String, String> getHeaders() throws AuthFailureError {
-                Map<String, String> headers = new HashMap<>();
-                headers.put("Authorization", "Bearer " + authManager.getAccessToken());
-                return headers;
+                return createAuthHeaders();
             }
         };
 
         requestQueue.add(request);
+        if (pendingReminderId != null) {
+            showCompleteReminderDialog(pendingReminderId);
+            pendingReminderId = null;
+        }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void handleRemindersResponse(JSONArray response) {
+        try {
+            reminderList.clear();
+            for (int i = 0; i < response.length(); i++) {
+                JSONObject reminderJson = response.getJSONObject(i);
+                Reminder reminder = parseReminderFromJson(reminderJson);
+                if (reminder != null) {
+                    reminderList.add(reminder);
+                }
+            }
+            reminderAdapter.notifyDataSetChanged();
+            if (pendingReminderId != null) {
+                showCompleteReminderDialog(pendingReminderId);
+                pendingReminderId = null;
+            }
+        } catch (JSONException e) {
+            Log.e("Recordatorios", "Error parsing reminders", e);
+            Toast.makeText(this, "Error al procesar recordatorios", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void handleRemindersError(VolleyError error) {
+        String errorMsg = "Error al cargar recordatorios";
+        if (error.networkResponse != null && error.networkResponse.data != null) {
+            errorMsg += ": " + new String(error.networkResponse.data);
+        }
+        Log.e("Recordatorios", errorMsg, error);
+        Toast.makeText(this, errorMsg, Toast.LENGTH_SHORT).show();
+    }
+
     private Reminder parseReminderFromJson(JSONObject json) throws JSONException {
         Reminder reminder = new Reminder();
-        reminder.id = json.getInt("id");
-        reminder.title = json.getString("title");
-        reminder.description = json.getString("description");
-        reminder.isRecurring = json.getBoolean("is_recurring");
-        reminder.recurrenceType = json.getString("recurrence_type");
-        reminder.recurrenceValue = json.getInt("recurrence_value");
-        String dueDateRaw = json.getString("due_date");
         try {
-            OffsetDateTime offsetDateTime = OffsetDateTime.parse(dueDateRaw);
-            LocalDateTime localDateTime = offsetDateTime.toLocalDateTime();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-            reminder.dueDate = localDateTime.format(formatter);
-        } catch (DateTimeParseException e) {
-            Log.e("Recordatorios", "Error al parsear la fecha: " + dueDateRaw);
-            reminder.dueDate = dueDateRaw; // Fallback si falla
-        }
+            reminder.id = json.getInt("id");
+            reminder.title = json.getString("title");
+            reminder.description = json.getString("description");
+            reminder.isRecurring = json.getBoolean("is_recurring");
+            reminder.recurrenceType = json.getString("recurrence_type");
+            reminder.recurrenceValue = json.getInt("recurrence_value");
+            reminder.status = json.optString("status", "PENDING");
+            String dueDateRaw = json.getString("due_date");
+            reminder.dueDate = dueDateRaw;
 
-        // Handle pet data
-        if (!json.isNull("pet")) {
+            // Programar alarma si es una fecha futura
             try {
-                // Pet might be just an ID or an object
+                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date date = sdf.parse(dueDateRaw);
+                if (date != null && date.getTime() > System.currentTimeMillis()) {
+                    scheduleReminderAlarm(
+                            reminder.id,
+                            reminder.title,
+                            reminder.description,
+                            date.getTime()
+                    );
+                }
+            } catch (Exception e) {
+                Log.e("Recordatorios", "Error al parsear fecha", e);
+            }
+
+            // Manejar mascota
+            if (!json.isNull("pet")) {
                 if (json.get("pet") instanceof JSONObject) {
                     JSONObject petJson = json.getJSONObject("pet");
                     Reminder.Pet pet = new Reminder.Pet();
@@ -372,7 +641,6 @@ public class recordatorios extends BaseActivity {
                     pet.photoUrl = petJson.optString("photo_url", null);
                     reminder.pet = pet;
                 } else {
-                    // If pet is just an ID, find it in availablePets
                     int petId = json.getInt("pet");
                     for (Reminder.Pet pet : availablePets) {
                         if (pet.id == petId) {
@@ -381,28 +649,28 @@ public class recordatorios extends BaseActivity {
                         }
                     }
                 }
-            } catch (JSONException e) {
-                Log.e("Recordatorios", "Error parsing pet data", e);
             }
-        }
 
-        // Handle assigned user
-        if (!json.isNull("assigned_to")) {
-            int assignedToId = json.getInt("assigned_to");
-            for (Reminder.FamilyMember member : availableFamilyMembers) {
-                if (member.id == assignedToId) {
-                    reminder.assignedTo = member;
-                    break;
+            // Manejar usuario asignado
+            if (!json.isNull("assigned_to")) {
+                int assignedToId = json.getInt("assigned_to");
+                for (Reminder.FamilyMember member : availableFamilyMembers) {
+                    if (member.id == assignedToId) {
+                        reminder.assignedTo = member;
+                        break;
+                    }
                 }
+            } else if (!json.isNull("family")) {
+                Reminder.FamilyMember todos = new Reminder.FamilyMember();
+                todos.id = -1;
+                todos.name = "Todos los miembros";
+                reminder.assignedTo = todos;
             }
-        } else if (!json.isNull("family")) {
-            // If no assigned_to but has family, it's for all members
-            Reminder.FamilyMember todos = new Reminder.FamilyMember();
-            todos.id = -1;
-            todos.name = "Todos los miembros";
-            reminder.assignedTo = todos;
-        }
 
+        } catch (JSONException e) {
+            Log.e("Recordatorios", "Error parsing reminder JSON", e);
+            return null;
+        }
         return reminder;
     }
 
@@ -467,9 +735,9 @@ public class recordatorios extends BaseActivity {
     }
 
     private void saveReminder() {
-        String title = etReminderTitle.getText().toString().trim();
-        String description = etReminderDescription.getText().toString().trim();
-        boolean isRecurring = rbRecurring.isChecked();
+        final String title = etReminderTitle.getText().toString().trim();
+        final String description = etReminderDescription.getText().toString().trim();
+        final boolean isRecurring = rbRecurring.isChecked();
 
         if (title.isEmpty()) {
             etReminderTitle.setError("El título es obligatorio");
@@ -483,14 +751,15 @@ public class recordatorios extends BaseActivity {
 
         SimpleDateFormat apiDateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault());
         apiDateFormat.setTimeZone(TimeZone.getTimeZone("America/Mexico_City"));
+        final String dueDate = apiDateFormat.format(selectedDateTime.getTime());
 
         try {
             JSONObject requestBody = new JSONObject();
             requestBody.put("title", title);
             requestBody.put("description", description);
-            requestBody.put("due_date", apiDateFormat.format(selectedDateTime.getTime()));
+            requestBody.put("due_date", dueDate);
             requestBody.put("is_recurring", isRecurring);
-            requestBody.put("user", authManager.getUserId()); // Changed from created_by to user
+            requestBody.put("user", authManager.getUserId());
 
             if (isRecurring) {
                 String recurrenceType = spRecurrenceType.getSelectedItem().toString();
@@ -503,40 +772,40 @@ public class recordatorios extends BaseActivity {
                 requestBody.put("pet", availablePets.get(spPets.getSelectedItemPosition() - 1).id);
             }
 
-            // Handle family member selection
             int selectedPosition = spFamilyMembers.getSelectedItemPosition();
             if (selectedPosition > 0) {
                 Reminder.FamilyMember selected = availableFamilyMembers.get(selectedPosition - 1);
-                if (selected.id != -1) { // Specific member
+                if (selected.id != -1) {
                     requestBody.put("assigned_to", selected.id);
                 }
             }
 
-            // Only send family ID if user actually has a family
             int familyId = authManager.getFamilyId();
-            if (familyId > 0) { // Changed from != -1 to > 0
+            if (familyId > 0) {
                 requestBody.put("family", familyId);
             }
-
-            Log.d("Recordatorios", "Enviando recordatorio: " + requestBody.toString());
 
             String url = getString(R.string.apiUrl) + "reminders/";
             JsonObjectRequest request = new JsonObjectRequest(Request.Method.POST, url, requestBody,
                     response -> {
-                        Log.d("Recordatorios", "Recordatorio creado: " + response.toString());
-                        Toast.makeText(this, "Recordatorio creado", Toast.LENGTH_SHORT).show();
-                        loadReminders();
-                        toggleFormVisibility();
-                    },
-                    error -> {
                         try {
-                            String errorMsg = new String(error.networkResponse.data, StandardCharsets.UTF_8);
-                            Log.e("Recordatorios", "Error al crear recordatorio: " + errorMsg);
-                            Toast.makeText(this, "Error: " + errorMsg, Toast.LENGTH_LONG).show();
-                        } catch (Exception e) {
-                            Log.e("Recordatorios", "Error al crear recordatorio", e);
+                            int reminderId = response.getInt("id");
+                            scheduleReminderAlarm(reminderId, title, description, selectedDateTime.getTimeInMillis());
+                            Toast.makeText(this, "Recordatorio creado", Toast.LENGTH_SHORT).show();
+                            loadReminders();
+                            toggleFormVisibility();
+                        } catch (JSONException e) {
+                            Log.e("Recordatorios", "Error al parsear respuesta", e);
                             Toast.makeText(this, "Error al crear recordatorio", Toast.LENGTH_SHORT).show();
                         }
+                    },
+                    error -> {
+                        String errorMsg = "Error al crear recordatorio";
+                        if (error.networkResponse != null && error.networkResponse.data != null) {
+                            errorMsg += ": " + new String(error.networkResponse.data);
+                        }
+                        Log.e("Recordatorios", errorMsg, error);
+                        Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
                     }
             ) {
                 @Override
@@ -553,6 +822,61 @@ public class recordatorios extends BaseActivity {
             Log.e("Recordatorios", "Error al preparar la solicitud", e);
             Toast.makeText(this, "Error al preparar la solicitud: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void scheduleReminderAlarm(int reminderId, String title, String description, long triggerAtMillis) {
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ReminderAlarmReceiver.class);
+        intent.putExtra("title", title);
+        intent.putExtra("description", description);
+        intent.putExtra("reminderId", reminderId);
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                this,
+                reminderId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (alarmManager.canScheduleExactAlarms()) {
+                setExactAlarm(alarmManager, triggerAtMillis, pendingIntent);
+            } else {
+                requestExactAlarmPermission();
+            }
+        } else {
+            setExactAlarm(alarmManager, triggerAtMillis, pendingIntent);
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.S)
+    private void requestExactAlarmPermission() {
+        Intent intent = new Intent(ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+        startActivity(intent);
+        Toast.makeText(this, "Por favor permite alarmas exactas en configuración", Toast.LENGTH_LONG).show();
+    }
+
+    private void setExactAlarm(AlarmManager alarmManager, long triggerAtMillis, PendingIntent pendingIntent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+            );
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+            );
+        } else {
+            alarmManager.set(
+                    AlarmManager.RTC_WAKEUP,
+                    triggerAtMillis,
+                    pendingIntent
+            );
+        }
+        Log.d("Recordatorios", "Alarma programada para: " + new Date(triggerAtMillis));
     }
 
     private void showReminderDetails(Reminder reminder) {
@@ -603,7 +927,7 @@ public class recordatorios extends BaseActivity {
 
                     StringRequest request = new StringRequest(Request.Method.DELETE, url,
                             response -> {
-                                Toast.makeText(recordatorios.this, "Recordatorio eliminado", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, "Recordatorio eliminado", Toast.LENGTH_SHORT).show();
                                 loadReminders();
                             },
                             error -> {
@@ -612,22 +936,40 @@ public class recordatorios extends BaseActivity {
                                     errorMsg += ": " + new String(error.networkResponse.data);
                                 }
                                 Log.e("Recordatorios", errorMsg, error);
-                                Toast.makeText(recordatorios.this, errorMsg, Toast.LENGTH_LONG).show();
+                                Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
                             }
                     ) {
                         @Override
                         public Map<String, String> getHeaders() throws AuthFailureError {
-                            Map<String, String> headers = new HashMap<>();
-                            headers.put("Authorization", "Bearer " + authManager.getAccessToken());
-                            return headers;
+                            return createAuthHeaders();
                         }
                     };
 
                     requestQueue.add(request);
-
                 })
                 .setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss())
                 .show();
+    }
+
+    private Map<String, String> createAuthHeaders() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Authorization", "Bearer " + authManager.getAccessToken());
+        return headers;
+    }
+
+    private void cancelReminderAlarm(int reminderId) {
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, ReminderAlarmReceiver.class);
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                this,
+                reminderId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        alarmManager.cancel(pendingIntent);
+        Log.d("Recordatorios", "Alarma cancelada para el recordatorio ID: " + reminderId);
     }
 
 }
