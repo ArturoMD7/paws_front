@@ -5,6 +5,8 @@ import static android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.app.TimePickerDialog;
@@ -33,6 +35,7 @@ import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.annotation.RequiresApi;
+import androidx.core.app.NotificationCompat;
 import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -196,7 +199,15 @@ public class recordatorios extends BaseActivity {
 
             @Override
             public void onCompleteReminder(Reminder reminder) {
-                showCompleteReminderDialog(reminder.getId());
+                int currentUserId = authManager.getUserId();
+                int assignedToId = reminder.getAssignedTo() != null ? reminder.getAssignedTo().id : -1;
+
+                // Solo permitir completar si el usuario es el asignado o está asignado a todos (-1)
+                if (assignedToId == -1 || assignedToId == currentUserId) {
+                    showCompleteReminderDialog(reminder.getId());
+                } else {
+                    Toast.makeText(recordatorios.this, "Este recordatorio solo puede ser completado por el usuario asignado.", Toast.LENGTH_LONG).show();
+                }
             }
         });
         rvReminders.setAdapter(reminderAdapter); // Faltaba esta línea
@@ -218,6 +229,10 @@ public class recordatorios extends BaseActivity {
                     progressDialog.dismiss();
                     Toast.makeText(this, "Recordatorio completado", Toast.LENGTH_SHORT).show();
                     loadReminders();
+
+                    // Mostrar notificación local
+                    showLocalNotification("Recordatorio completado",
+                            "Has completado un recordatorio exitosamente");
                 },
                 error -> {
                     progressDialog.dismiss();
@@ -239,6 +254,26 @@ public class recordatorios extends BaseActivity {
         requestQueue.add(request);
     }
 
+    private void showLocalNotification(String title, String message) {
+        NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    "reminder_channel",
+                    "Recordatorios",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            notificationManager.createNotificationChannel(channel);
+        }
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, "reminder_channel")
+                .setSmallIcon(R.drawable.logomiau)
+                .setContentTitle(title)
+                .setContentText(message)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+    }
     private void setupRecurrenceSpinner() {
         String[] recurrenceTypes = {"Día(s)", "Semana(s)", "Mes(es)"};
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
@@ -614,21 +649,40 @@ public class recordatorios extends BaseActivity {
             String dueDateRaw = json.getString("due_date");
             reminder.dueDate = dueDateRaw;
 
-            // Programar alarma si es una fecha futura
-            try {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
-                sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-                Date date = sdf.parse(dueDateRaw);
-                if (date != null && date.getTime() > System.currentTimeMillis()) {
-                    scheduleReminderAlarm(
-                            reminder.id,
-                            reminder.title,
-                            reminder.description,
-                            date.getTime()
-                    );
+            // Manejar usuario asignado
+            if (!json.isNull("assigned_to")) {
+                int assignedToId = json.getInt("assigned_to");
+                JSONObject assignedToJson = json.optJSONObject("assigned_to_user");
+
+                if (assignedToJson != null) {
+                    // Si viene el objeto completo del usuario
+                    Reminder.FamilyMember member = new Reminder.FamilyMember();
+                    member.id = assignedToId;
+                    member.name = assignedToJson.getString("first_name") + " " +
+                            assignedToJson.getString("last_name");
+                    reminder.assignedTo = member;
+                } else {
+                    // Si solo viene el ID, buscar en la lista de miembros
+                    boolean encontrado = false;
+                    for (Reminder.FamilyMember member : availableFamilyMembers) {
+                        if (member.id == assignedToId) {
+                            reminder.assignedTo = member;
+                            encontrado = true;
+                            break;
+                        }
+                    }
+                    if (!encontrado) {
+                        Reminder.FamilyMember unknown = new Reminder.FamilyMember();
+                        unknown.id = assignedToId;
+                        unknown.name = "Usuario #" + assignedToId;
+                        reminder.assignedTo = unknown;
+                    }
                 }
-            } catch (Exception e) {
-                Log.e("Recordatorios", "Error al parsear fecha", e);
+            } else {
+                Reminder.FamilyMember todos = new Reminder.FamilyMember();
+                todos.id = -1;
+                todos.name = "Todos los miembros";
+                reminder.assignedTo = todos;
             }
 
             // Manejar mascota
@@ -651,22 +705,7 @@ public class recordatorios extends BaseActivity {
                 }
             }
 
-            // Manejar usuario asignado
-            if (!json.isNull("assigned_to")) {
-                int assignedToId = json.getInt("assigned_to");
-                for (Reminder.FamilyMember member : availableFamilyMembers) {
-                    if (member.id == assignedToId) {
-                        reminder.assignedTo = member;
-                        break;
-                    }
-                }
-            } else if (!json.isNull("family")) {
-                Reminder.FamilyMember todos = new Reminder.FamilyMember();
-                todos.id = -1;
-                todos.name = "Todos los miembros";
-                reminder.assignedTo = todos;
-            }
-
+            // ... resto del código ...
         } catch (JSONException e) {
             Log.e("Recordatorios", "Error parsing reminder JSON", e);
             return null;
@@ -790,7 +829,15 @@ public class recordatorios extends BaseActivity {
                     response -> {
                         try {
                             int reminderId = response.getInt("id");
-                            scheduleReminderAlarm(reminderId, title, description, selectedDateTime.getTimeInMillis());
+                            int assignedToId = -1; // Valor por defecto (para "Todos")
+
+                            if (selectedPosition > 0) {
+                                Reminder.FamilyMember selected = availableFamilyMembers.get(selectedPosition - 1);
+                                if (selected.id != -1) {
+                                    assignedToId = selected.id;
+                                }
+                            }
+                            scheduleReminderAlarm(reminderId, title, description, selectedDateTime.getTimeInMillis(), assignedToId);
                             Toast.makeText(this, "Recordatorio creado", Toast.LENGTH_SHORT).show();
                             loadReminders();
                             toggleFormVisibility();
@@ -824,12 +871,13 @@ public class recordatorios extends BaseActivity {
         }
     }
 
-    private void scheduleReminderAlarm(int reminderId, String title, String description, long triggerAtMillis) {
+    private void scheduleReminderAlarm(int reminderId, String title, String description, long triggerAtMillis, int assignedToId) {
         AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(this, ReminderAlarmReceiver.class);
         intent.putExtra("title", title);
         intent.putExtra("description", description);
         intent.putExtra("reminderId", reminderId);
+        intent.putExtra("assignedToId", assignedToId); // Nuevo: ID del usuario asignado
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 this,
@@ -886,20 +934,17 @@ public class recordatorios extends BaseActivity {
 
         try {
             Date date = apiDateFormat.parse(reminder.getDueDate());
-            details.append("Fecha y hora: ").append(dateFormat.format(date)).append(" ").append(timeFormat.format(date)).append("\n");
+            details.append("Fecha y hora: ").append(dateFormat.format(date))
+                    .append(" ").append(timeFormat.format(date)).append("\n");
         } catch (Exception e) {
             details.append("Fecha y hora: ").append(reminder.getDueDate()).append("\n");
         }
 
-        if (reminder.getAssignedTo() != null) {
-            details.append("Asignado a: ").append(reminder.getAssignedTo().name).append("\n");
-        } else {
-            details.append("Asignado a: Todos\n");
-        }
+        // Mostrar información de asignación
+        details.append("Asignado a: ").append(reminder.getAssignedToName()).append("\n");
 
-        if (reminder.getPet() != null) {
-            details.append("Mascota: ").append(reminder.getPet().name).append("\n");
-        }
+        // Mostrar información de mascota
+        details.append("Mascota: ").append(reminder.getPetName()).append("\n");
 
         if (reminder.isRecurring()) {
             String recurrenceText = "Repetición: Cada " + reminder.getRecurrenceValue() + " ";

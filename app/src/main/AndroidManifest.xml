@@ -40,9 +40,6 @@
             android:exported="false"
             android:foregroundServiceType="camera" />
         <activity
-            android:name=".notification"
-            android:exported="false" />
-        <activity
             android:name=".FamilySetupActivity"
             android:exported="false"/>
         <activity

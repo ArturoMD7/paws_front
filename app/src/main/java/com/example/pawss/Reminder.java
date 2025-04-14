@@ -57,6 +57,7 @@ public class Reminder {
         return status;
     }
 
+
     // Método para obtener la fecha formateada para mostrar
     public String getFormattedDateTime() {
         try {
@@ -67,14 +68,18 @@ public class Reminder {
         }
     }
 
-    // Método para obtener el nombre del destinatario
     public String getAssignedToName() {
-        return assignedTo != null ? assignedTo.name : "Todos";
+        if (assignedTo != null) {
+            return assignedTo.name;
+        }
+        return "Todos los miembros";
     }
 
-    // Método para obtener el nombre de la mascota
     public String getPetName() {
-        return pet != null ? pet.name : "Ninguna";
+        if (pet != null) {
+            return pet.name;
+        }
+        return "Sin mascota";
     }
 
     // Clase interna para mascotas

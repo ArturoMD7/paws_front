@@ -54,6 +54,27 @@ public class ReminderAdapter extends RecyclerView.Adapter<ReminderAdapter.Remind
     @Override
     public void onBindViewHolder(@NonNull ReminderViewHolder holder, int position) {
         Reminder reminder = reminderList.get(position);
+
+        holder.tvReminderTitle.setText(reminder.getTitle());
+
+        // Mostrar información de asignación y mascota
+        holder.tvAssignedTo.setText("Asignado a: " + reminder.getAssignedToName());
+
+        if (reminder.getPet() != null) {
+            holder.tvPet.setText("Mascota: " + reminder.getPetName());
+        } else {
+            holder.tvPet.setText("Mascota: No especificada");
+        }
+
+        // Formatear fecha
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault());
+            Date date = sdf.parse(reminder.getDueDate());
+            SimpleDateFormat outputFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+            holder.tvReminderDateTime.setText(outputFormat.format(date));
+        } catch (Exception e) {
+            holder.tvReminderDateTime.setText(reminder.getDueDate());
+        }
         holder.bind(reminder, listener);
     }
 

@@ -24,25 +24,17 @@ public class ReminderAlarmReceiver extends BroadcastReceiver {
         String title = intent.getStringExtra("title");
         String description = intent.getStringExtra("description");
         int reminderId = intent.getIntExtra("reminderId", -1);
+        int assignedToId = intent.getIntExtra("assignedToId", -1);
 
-        // Iniciar servicio de notificación persistente
-        Intent serviceIntent = new Intent(context, AlarmFlashVibrateService.class);
-        serviceIntent.putExtra("reminderId", reminderId);
-        serviceIntent.putExtra("title", title);
-        serviceIntent.putExtra("description", description);
+        AuthManager authManager = new AuthManager(context);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent);
-        } else {
-            context.startService(serviceIntent);
+        // Verificar si la notificación es para este usuario
+        if (assignedToId != -1 && assignedToId != authManager.getUserId()) {
+            return; // No es para este usuario
         }
 
         // Mostrar notificación
-        showNotification(context, title, description, reminderId);
-    }
-
-    private void showNotification(Context context, String title, String content, int reminderId) {
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -50,46 +42,28 @@ public class ReminderAlarmReceiver extends BroadcastReceiver {
                     "Recordatorios",
                     NotificationManager.IMPORTANCE_HIGH
             );
-            manager.createNotificationChannel(channel);
+            notificationManager.createNotificationChannel(channel);
         }
 
-        // Intent para abrir la app al tocar la notificación
-        Intent activityIntent = new Intent(context, recordatorios.class);
-        activityIntent.putExtra("reminderId", reminderId);
-        activityIntent.setAction("COMPLETE_REMINDER");
-        activityIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        Intent notificationIntent = new Intent(context, recordatorios.class);
+        notificationIntent.putExtra("reminderId", reminderId);
+        notificationIntent.setAction("COMPLETE_REMINDER");
 
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
                 reminderId,
-                activityIntent,
+                notificationIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-
-        // Intent específico para el botón "Completar"
-        Intent completeIntent = new Intent(context, recordatorios.class);
-        completeIntent.putExtra("reminderId", reminderId);
-        completeIntent.setAction("COMPLETE_REMINDER");
-        completeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-
-        PendingIntent completePendingIntent = PendingIntent.getActivity(
-                context,
-                reminderId + 1000, // Diferente ID para evitar colisión
-                completeIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-
-        // Crear la notificación
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, "reminder_channel")
                 .setSmallIcon(R.drawable.logomiau)
                 .setContentTitle(title)
-                .setContentText(content)
+                .setContentText(description)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setContentIntent(pendingIntent) // Acción al tocar la notificación
-                .setAutoCancel(true)
-                .addAction(R.drawable.pawprint, "Completar", completePendingIntent); // Acción del botón
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true);
 
-        manager.notify(reminderId, builder.build());
+        notificationManager.notify(reminderId, builder.build());
     }
 }
