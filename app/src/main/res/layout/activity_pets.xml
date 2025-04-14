@@ -42,15 +42,7 @@
             android:clickable="true"
             android:focusable="true"/>
 
-        <ImageView
-            android:id="@+id/settingsIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/settings"
-            android:contentDescription="Ajustes"
-            android:clickable="true"
-            android:focusable="true"
-            android:layout_marginStart="16dp"/>
+
     </LinearLayout>
 
     <!-- Contenedor principal -->

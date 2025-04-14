@@ -83,6 +83,7 @@
                     android:id="@+id/btnSelectImage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:backgroundTint="@color/primary"
                     android:text="Seleccionar imagen"
                     android:layout_marginTop="8dp" />
 
@@ -98,6 +99,7 @@
 
                 <Button
                     android:id="@+id/btnSavePost"
+                    android:backgroundTint="@color/primary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Publicar"
